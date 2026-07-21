@@ -1,10 +1,13 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
+# Python
+.venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Database
+*.sqlite3
+*.db
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
@@ -40,6 +43,7 @@ build/Release
 # Dependency directories
 node_modules/
 jspm_packages/
+*.local
 
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
@@ -148,3 +152,35 @@ Thumbs.db
 
 # Archive
 data/raw/
+data/
+*.tiff
+*.tif
+*.png
+*.jpg
+*.jpeg
+*.pdf
+!frontend/src/assets/*.png
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
