@@ -152,7 +152,6 @@ archive-workbench/
 │   └── worker.py
 ├── data/                   # Local Staging (Git-ignored)
 │   ├── raw/                # Symlinks or copies of original scans
-│   ├── reference/          # Carl's low-res scans for matching
 │   └── exports/            # Prepared JSON for Omeka S
 ├── docs/                   # Documentation
 │   ├── architecture/       # The v1.0 Document and ERDs
