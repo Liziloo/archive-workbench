@@ -155,17 +155,10 @@ archive-workbench/
 │   ├── reference/          # Carl's low-res scans for matching
 │   └── exports/            # Prepared JSON for Omeka S
 ├── docs/                   # Documentation
-│   ├── architecture/       # The v1.3 Document and ERDs
+│   ├── architecture/       # The v1.0 Document and ERDs
 │   ├── hierarchy/          # Physical Finding Aid (Series/Box/Folder)
 │   └── api/                # API Specs
 ├── docker-compose.yml      # Orchestration for Postgres, Redis, and App
 ├── .gitignore              # Crucial: Ignore large assets and DB files
 └── README.md
 ```
-
-### Key Considerations for this Structure:
-
-1.  **The `data/` directory:** This is your local "Staging Area." It should not contain the actual archive (which stays in your main storage), but rather the **working copies** or **symlinks** the Workbench is currently processing.
-2.  **The `adapters/` pattern:** By putting Tropy, Immich, and Carl's Catalog into an `adapters` folder, you make the system reusable. If you add a new source (like a spreadsheet from a different relative), you just write a new adapter.
-3.  **Separation of `ai/`:** Keeping the AI logic (prompts and ROCm calls) separate from the API logic allows you to swap models (e.g., switching from Llama-3-Vision to a newer model) without breaking the curation workflow.
-4.  **The `workers/` directory:** Since hashing thousands of files and running VLMs is resource-intensive, these must live in background workers so your UI doesn't freeze.
