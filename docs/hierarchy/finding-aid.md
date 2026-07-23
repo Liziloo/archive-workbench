@@ -1,4 +1,4 @@
-# Haushalter-Casler Family Archive Finding Aid
+# Haushalter-Casler Archive Finding Aid
 
 ## Collection Overview
 
@@ -160,4 +160,4 @@ Serving as a substantial genealogical and regional archive, this container is fi
 This container serves as a compact collection dedicated strictly to mid-20th-century historical print media and journalism. Its contents consist of original Buffalo-area newspaper issues bearing major front-page headlines from critical historical moments—including World War II, the Vietnam War, and the Space Race—as well as a curated selection of _Time Magazine_ issues published during World War II.
 
 ### Carl’s Bin
-This container functions mainly as a visual and photographic archive, containing family photo albums, loose vacation snapshots spanning several decades, travel brochures, and personal mementos associated with Carl Haushalter and his relatives. Specific items of notable historical value stored within the bin include original Air Force base photographs, a copy of the July 21, 1969 _New York Times_ front-page cover story detailing the Apollo 11 moonwalk, and a formal 2003 Stage 1 Cultural Resource Investigation report conducted for the family farm.
+This container functions mainly as a visual and photographic archive, containing family photo albums, loose vacation snapshots spanning several decades, travel brochures, and personal mementos associated with Carl Haushalter and his relatives. Specific items of notable historical value stored within the bin include original Air Force base photographs, a copy of the July 21, 1969 _New York Times_ front-page cover story detailing the Apollo 11 moonwalk, and a formal 2003 Stage 1 Cultural Resource Investigation report conducted for the family farm. The bin also contains many photos and documents relating to Carl's career, specifically his work with McDonnell-Douglas and the United States Space Program.
