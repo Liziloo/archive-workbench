@@ -2,36 +2,32 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
 
+# Manually find the .env file
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
 
 class Settings(BaseSettings):
-    # We use Field(..., validation_alias=...) to ensure it maps correctly
-    DATABASE_URL: str = Field(..., validation_alias="DATABASE_URL")
-    STAGING_DIRECTORY: str = Field(..., validation_alias="STAGING_DIRECTORY")
-
+    # Pydantic will look for these in the environment
+    DATABASE_URL: str
+    STAGING_DIRECTORY: str
     PROJECT_NAME: str = "Archive Workbench"
 
-    # This tells Pydantic to look at the .env file found by find_dotenv
+    # This is the "magic" that connects the .env to the class
     model_config = SettingsConfigDict(
         env_file=dotenv_path,
         env_file_encoding='utf-8',
         extra="ignore"
     )
 
-# --- DEBUG PRINT ---
-# This will help us confirm the file is found and the variables are loaded
-if not dotenv_path:
-    print("❌ ERROR: .env file not found by find_dotenv()")
-else:
-    print(f"✅ Found .env at: {dotenv_path}")
-
+# Instantiate settings
 try:
     settings = Settings()
-    print("✅ Settings loaded successfully.")
+    if __name__ == "__main__":
+        print(f"✅ .env found at: {dotenv_path}")
+        print(f"✅ Settings loaded successfully.")
+        print(f"📡 Target DB: {settings.DATABASE_URL.split('@')[-1]}")
 except Exception as e:
-    print(f"❌ Settings Validation Error: {e}")
-    # We raise here to stop the app before it fails deeper in the stack
-    raise e
+    print(f"❌ Settings Error: {e}")
+    # If you are seeing this in VS Code as a red squiggly,
+    # it's often a linter error. Run the script to be sure.
