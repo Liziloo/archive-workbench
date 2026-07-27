@@ -1,0 +1,2073 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+backend/
+  app/
+    core/
+      __init__.py
+      config.py
+    db/
+      __init__.py
+      init_db.py
+      session.py
+    models/
+      __init__.py
+      core.py
+    services/
+      __init__.py
+      harvester.py
+      run_harvester.py
+    __init__.py
+  migrations/
+    env.py
+    README
+    script.py.mako
+  .python-version
+  alembic.ini
+  main.py
+  pyproject.toml
+  README.md
+docs/
+  architecture/
+    architecture.md
+    database.md
+    import-formats.md
+    omeka-integration.md
+    prompt-design.md
+    roadmap.md
+    workflow.md
+  hierarchy/
+    finding-aid.md
+frontend/
+  public/
+    favicon.svg
+    icons.svg
+  src/
+    assets/
+      hero.png
+      react.svg
+      vite.svg
+    App.css
+    App.tsx
+    index.css
+    main.tsx
+  eslint.config.js
+  index.html
+  package.json
+  README.md
+  tsconfig.app.json
+  tsconfig.json
+  tsconfig.node.json
+  vite.config.ts
+.gitignore
+LICENSE
+README.md
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="backend/app/core/__init__.py">
+
+</file>
+
+<file path="backend/app/core/config.py">
+import os
+from pathlib import Path
+from dotenv import load_dotenv, find_dotenv
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
+
+dotenv_path = find_dotenv()
+load_dotenv(dotenv_path)
+
+class Settings(BaseSettings):
+    # We use Field(..., validation_alias=...) to ensure it maps correctly
+    DATABASE_URL: str = Field(..., validation_alias="DATABASE_URL")
+    STAGING_DIRECTORY: str = Field(..., validation_alias="STAGING_DIRECTORY")
+
+    PROJECT_NAME: str = "Archive Workbench"
+
+    # This tells Pydantic to look at the .env file found by find_dotenv
+    model_config = SettingsConfigDict(
+        env_file=dotenv_path,
+        env_file_encoding='utf-8',
+        extra="ignore"
+    )
+
+# --- DEBUG PRINT ---
+# This will help us confirm the file is found and the variables are loaded
+if not dotenv_path:
+    print("❌ ERROR: .env file not found by find_dotenv()")
+else:
+    print(f"✅ Found .env at: {dotenv_path}")
+
+try:
+    settings = Settings()
+    print("✅ Settings loaded successfully.")
+except Exception as e:
+    print(f"❌ Settings Validation Error: {e}")
+    # We raise here to stop the app before it fails deeper in the stack
+    raise e
+</file>
+
+<file path="backend/app/db/__init__.py">
+
+</file>
+
+<file path="backend/app/db/init_db.py">
+from sqlmodel import SQLModel, create_engine
+from app.core.config import settings
+from app.models.core import DigitalAsset, ArchivalItem, EvidenceClaim, AuthorityLink
+
+engine = create_engine(settings.DATABASE_URL)
+
+def create_db_and_tables():
+    # This will reach out to the server and create the tables
+    SQLModel.metadata.create_all(engine)
+    print("✅ Database schema synchronized with server.")
+
+if __name__ == "__main__":
+    create_db_and_tables()
+</file>
+
+<file path="backend/app/db/session.py">
+from sqlmodel import create_engine, Session
+from app.core.config import settings # Assuming a config for DATABASE_URL
+
+engine = create_engine(
+    settings.DATABASE_URL,
+    echo=True, # Useful for debugging SQL during development
+    json_serializer=lambda obj: obj # Let Postgres handle JSONB optimization
+)
+
+def get_session():
+    with Session(engine) as session:
+        yield session
+</file>
+
+<file path="backend/app/models/__init__.py">
+
+</file>
+
+<file path="backend/app/services/__init__.py">
+
+</file>
+
+<file path="backend/app/services/harvester.py">
+import hashlib
+import pathlib
+from typing import List
+from sqlmodel import Session, select
+from app.models.core import DigitalAsset, ArchivalItem, AssetRole, VerificationStatus
+
+class HarvesterService:
+    def __init__(self, session: Session):
+        self.session = session
+
+    def calculate_sha256(self, file_path: pathlib.Path) -> str:
+        """Memory-efficient hashing for large archival TIFFs."""
+        sha256_hash = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            for byte_block in iter(lambda: f.read(8192), b""):
+                sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
+
+    def ingest_file(self, file_path: pathlib.Path):
+        """Processes a single file: Hash -> Match -> Register."""
+        file_hash = self.calculate_sha256(file_path)
+
+        # Level 1 Match: Check for existing hash
+        statement = select(DigitalAsset).where(DigitalAsset.sha256 == file_hash)
+        existing_asset = self.session.exec(statement).first()
+
+        if existing_asset:
+            # HEALING: If the file moved on the GPU-Monster, update the path
+            if existing_asset.file_path != str(file_path):
+                existing_asset.file_path = str(file_path)
+                self.session.add(existing_asset)
+                self.session.commit()
+            return existing_asset
+
+        # NEW ASSET: Create the hierarchy
+        # 1. Create a conceptual ArchivalItem (The 'Shell')
+        new_item = ArchivalItem(
+            physical_address={"inferred_from_path": str(file_path.parent)}
+        )
+        self.session.add(new_item)
+        self.session.flush() # Populates new_item.id
+
+        # 2. Create the DigitalAsset
+        new_asset = DigitalAsset(
+            sha256=file_hash,
+            file_path=str(file_path),
+            file_size=file_path.stat().st_size,
+            mime_type=file_path.suffix.lower(),
+            asset_role=AssetRole.PRIMARY,
+            verification=VerificationStatus.AUTO_CONFIRMED,
+            item_id=new_item.id
+        )
+        self.session.add(new_asset)
+        self.session.commit()
+        self.session.refresh(new_asset)
+        return new_asset
+
+    def scan(self, target_path: str):
+        """Recursive scan of the staging directory."""
+        root = pathlib.Path(target_path)
+        valid_exts = {'.jpg', '.jpeg', '.png', '.tif', '.tiff'}
+
+        count = 0
+        for path in root.rglob("*"):
+            if path.suffix.lower() in valid_exts:
+                self.ingest_file(path)
+                count += 1
+        return count
+</file>
+
+<file path="backend/app/services/run_harvester.py">
+
+</file>
+
+<file path="backend/app/__init__.py">
+
+</file>
+
+<file path="backend/app/models/core.py">
+from datetime import datetime
+from enum import Enum
+from typing import List, Optional, Dict, Any
+from uuid import UUID, uuid4
+from sqlalchemy import Column, JSON
+from sqlmodel import Field, Relationship, SQLModel
+
+# --- Enums ---
+
+class AssetRole(str, Enum):
+    PRIMARY = "primary"   # High-res scan
+    REFERENCE = "reference" # Low-res/Carl's catalog proxy
+    BACK = "back"         # Back of photo/document
+    SUPPORTING = "supporting" # Contextual material
+
+class VerificationStatus(str, Enum):
+    AUTO_CONFIRMED = "auto_confirmed"
+    PENDING = "pending"
+    REJECTED = "rejected"
+    VERIFIED = "verified"
+
+class ItemStatus(str, Enum):
+    DRAFT = "draft"
+    VERIFIED = "verified"
+    PUBLISHED = "published"
+
+# --- Models ---
+
+class DigitalAsset(SQLModel, table=True):
+    """The physical file on disk. Deterministic identity via SHA-256."""
+    sha256: str = Field(primary_key=True, index=True)
+    file_path: str = Field(unique=True)
+    file_size: int
+    mime_type: str
+    asset_role: AssetRole = Field(default=AssetRole.PRIMARY)
+    verification: VerificationStatus = Field(default=VerificationStatus.PENDING)
+
+    # Technical metadata (EXIF, resolution, etc.)
+    technical_metadata: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+
+    # Relationships
+    item_id: Optional[UUID] = Field(default=None, foreign_key="archivalitem.id")
+    item: Optional["ArchivalItem"] = Relationship(back_populates="digital_assets")
+
+class EvidenceClaim(SQLModel, table=True):
+    """Atomic data points extracted from sources (Tropy, XMP, AI)."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    source_context: str  # e.g., "Tropy-Export-2024", "DigiKam-XMP", "Ollama-VLM"
+    property: str        # e.g., "date_created", "subject_person", "transcription"
+    value: str
+    is_verified: bool = Field(default=False)
+
+    # Relationships
+    item_id: UUID = Field(foreign_key="archivalitem.id")
+    item: "ArchivalItem" = Relationship(back_populates="evidence_claims")
+
+class AuthorityLink(SQLModel, table=True):
+    """Links to external research (WikiTree, Obsidian, etc.)."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    system_name: str # "WikiTree", "Obsidian"
+    system_id: str   # The unique ID in that system
+    uri: Optional[str] = None
+
+    # Relationships
+    item_id: UUID = Field(foreign_key="archivalitem.id")
+    item: "ArchivalItem" = Relationship(back_populates="authority_links")
+
+class ArchivalItem(SQLModel, table=True):
+    """The conceptual 'Object'. The parent of all assets and evidence."""
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    status: ItemStatus = Field(default=ItemStatus.DRAFT)
+
+    # Physical-to-Digital Hierarchy
+    # Expected keys: series, box, folder, bin
+    physical_address: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+
+    # Legacy IDs from Tropy or Carl's Catalog
+    external_identifiers: Dict[str, str] = Field(default_factory=dict, sa_column=Column(JSON))
+
+    # The final, curated Dublin Core metadata for Omeka S
+    canonical_metadata: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+
+    # Relationships
+    digital_assets: List[DigitalAsset] = Relationship(back_populates="item")
+    evidence_claims: List[EvidenceClaim] = Relationship(back_populates="item")
+    authority_links: List[AuthorityLink] = Relationship(back_populates="item")
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+</file>
+
+<file path="backend/migrations/env.py">
+from logging.config import fileConfig
+
+from sqlalchemy import engine_from_config
+from sqlalchemy import pool
+
+from alembic import context
+
+# this is the Alembic Config object, which provides
+# access to the values within the .ini file in use.
+config = context.config
+
+# Interpret the config file for Python logging.
+# This line sets up loggers basically.
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+# add your model's MetaData object here
+# for 'autogenerate' support
+# from myapp import mymodel
+# target_metadata = mymodel.Base.metadata
+target_metadata = None
+
+# other values from the config, defined by the needs of env.py,
+# can be acquired:
+# my_important_option = config.get_main_option("my_important_option")
+# ... etc.
+
+
+def run_migrations_offline() -> None:
+    """Run migrations in 'offline' mode.
+
+    This configures the context with just a URL
+    and not an Engine, though an Engine is acceptable
+    here as well.  By skipping the Engine creation
+    we don't even need a DBAPI to be available.
+
+    Calls to context.execute() here emit the given string to the
+    script output.
+
+    """
+    url = config.get_main_option("sqlalchemy.url")
+    context.configure(
+        url=url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
+    )
+
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+def run_migrations_online() -> None:
+    """Run migrations in 'online' mode.
+
+    In this scenario we need to create an Engine
+    and associate a connection with the context.
+
+    """
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection, target_metadata=target_metadata
+        )
+
+        with context.begin_transaction():
+            context.run_migrations()
+
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()
+</file>
+
+<file path="backend/migrations/README">
+Generic single-database configuration.
+</file>
+
+<file path="backend/migrations/script.py.mako">
+"""${message}
+
+Revision ID: ${up_revision}
+Revises: ${down_revision | comma,n}
+Create Date: ${create_date}
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+${imports if imports else ""}
+
+# revision identifiers, used by Alembic.
+revision: str = ${repr(up_revision)}
+down_revision: Union[str, Sequence[str], None] = ${repr(down_revision)}
+branch_labels: Union[str, Sequence[str], None] = ${repr(branch_labels)}
+depends_on: Union[str, Sequence[str], None] = ${repr(depends_on)}
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+    ${upgrades if upgrades else "pass"}
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    ${downgrades if downgrades else "pass"}
+</file>
+
+<file path="backend/.python-version">
+3.10
+</file>
+
+<file path="backend/alembic.ini">
+# A generic, single database configuration.
+
+[alembic]
+# path to migration scripts.
+# this is typically a path given in POSIX (e.g. forward slashes)
+# format, relative to the token %(here)s which refers to the location of this
+# ini file
+script_location = %(here)s/migrations
+
+# template used to generate migration file names; The default value is %%(rev)s_%%(slug)s
+# Uncomment the line below if you want the files to be prepended with date and time
+# see https://alembic.sqlalchemy.org/en/latest/tutorial.html#editing-the-ini-file
+# for all available tokens
+# file_template = %%(year)d_%%(month).2d_%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s
+# Or organize into date-based subdirectories (requires recursive_version_locations = true)
+# file_template = %%(year)d/%%(month).2d/%%(day).2d_%%(hour).2d%%(minute).2d_%%(second).2d_%%(rev)s_%%(slug)s
+
+# sys.path path, will be prepended to sys.path if present.
+# defaults to the current working directory.  for multiple paths, the path separator
+# is defined by "path_separator" below.
+prepend_sys_path = .
+
+
+# timezone to use when rendering the date within the migration file
+# as well as the filename.
+# If specified, requires the tzdata library which can be installed by adding
+# `alembic[tz]` to the pip requirements.
+# string value is passed to ZoneInfo()
+# leave blank for localtime
+# timezone =
+
+# max length of characters to apply to the "slug" field
+# truncate_slug_length = 40
+
+# set to 'true' to run the environment during
+# the 'revision' command, regardless of autogenerate
+# revision_environment = false
+
+# set to 'true' to allow .pyc and .pyo files without
+# a source .py file to be detected as revisions in the
+# versions/ directory
+# sourceless = false
+
+# version location specification; This defaults
+# to <script_location>/versions.  When using multiple version
+# directories, initial revisions must be specified with --version-path.
+# The path separator used here should be the separator specified by "path_separator"
+# below.
+# version_locations = %(here)s/bar:%(here)s/bat:%(here)s/alembic/versions
+
+# path_separator; This indicates what character is used to split lists of file
+# paths, including version_locations and prepend_sys_path within configparser
+# files such as alembic.ini.
+# The default rendered in new alembic.ini files is "os", which uses os.pathsep
+# to provide os-dependent path splitting.
+#
+# Note that in order to support legacy alembic.ini files, this default does NOT
+# take place if path_separator is not present in alembic.ini.  If this
+# option is omitted entirely, fallback logic is as follows:
+#
+# 1. Parsing of the version_locations option falls back to using the legacy
+#    "version_path_separator" key, which if absent then falls back to the legacy
+#    behavior of splitting on spaces and/or commas.
+# 2. Parsing of the prepend_sys_path option falls back to the legacy
+#    behavior of splitting on spaces, commas, or colons.
+#
+# Valid values for path_separator are:
+#
+# path_separator = :
+# path_separator = ;
+# path_separator = space
+# path_separator = newline
+#
+# Use os.pathsep. Default configuration used for new projects.
+path_separator = os
+
+# set to 'true' to search source files recursively
+# in each "version_locations" directory
+# new in Alembic version 1.10
+# recursive_version_locations = false
+
+# the output encoding used when revision files
+# are written from script.py.mako
+# output_encoding = utf-8
+
+# database URL.  This is consumed by the user-maintained env.py script only.
+# other means of configuring database URLs may be customized within the env.py
+# file.
+sqlalchemy.url = driver://user:pass@localhost/dbname
+
+
+[post_write_hooks]
+# post_write_hooks defines scripts or Python functions that are run
+# on newly generated revision scripts.  See the documentation for further
+# detail and examples
+
+# format using "black" - use the console_scripts runner, against the "black" entrypoint
+# hooks = black
+# black.type = console_scripts
+# black.entrypoint = black
+# black.options = -l 79 REVISION_SCRIPT_FILENAME
+
+# lint with attempts to fix using "ruff" - use the module runner, against the "ruff" module
+# hooks = ruff
+# ruff.type = module
+# ruff.module = ruff
+# ruff.options = check --fix REVISION_SCRIPT_FILENAME
+
+# Alternatively, use the exec runner to execute a binary found on your PATH
+# hooks = ruff
+# ruff.type = exec
+# ruff.executable = ruff
+# ruff.options = check --fix REVISION_SCRIPT_FILENAME
+
+# Logging configuration.  This is also consumed by the user-maintained
+# env.py script only.
+[loggers]
+keys = root,sqlalchemy,alembic
+
+[handlers]
+keys = console
+
+[formatters]
+keys = generic
+
+[logger_root]
+level = WARNING
+handlers = console
+qualname =
+
+[logger_sqlalchemy]
+level = WARNING
+handlers =
+qualname = sqlalchemy.engine
+
+[logger_alembic]
+level = INFO
+handlers =
+qualname = alembic
+
+[handler_console]
+class = StreamHandler
+args = (sys.stderr,)
+level = NOTSET
+formatter = generic
+
+[formatter_generic]
+format = %(levelname)-5.5s [%(name)s] %(message)s
+datefmt = %H:%M:%S
+</file>
+
+<file path="backend/main.py">
+def main():
+    print("Hello from backend!")
+
+
+if __name__ == "__main__":
+    main()
+</file>
+
+<file path="backend/pyproject.toml">
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "alembic>=1.18.5",
+    "celery>=5.6.3",
+    "fastapi>=0.139.2",
+    "loguru>=0.7.3",
+    "pydantic-settings>=2.14.2",
+    "redis>=8.0.1",
+    "sqlmodel>=0.0.39",
+    "uvicorn[standard]>=0.51.0",
+]
+</file>
+
+<file path="backend/README.md">
+
+</file>
+
+<file path="docs/architecture/database.md">
+**Purpose:** Explains *why* the database is built the way it is.
+*   **Artifact-Centric:** One `ArchivalItem` can have many `DigitalAssets` (front scan, back scan, low-res reference).
+*   **Evidence Claims:** Explain that we store *raw* data from Tropy/Immich separately from the *canonical* data we send to Omeka.
+*   **JSONB Usage:** Explain that we use JSONB for `external_identifiers` so we can add new catalog IDs (like Carl's) without changing the database structure.
+</file>
+
+<file path="docs/architecture/import-formats.md">
+**Purpose:** Technical details on the external files we are harvesting.
+*   **Tropy:** We are looking for the `notes` and `tags` fields in the SQLite export.
+*   **DigiKam:** We are looking for `XMP-mwg-rs` (Face Regions) and `XMP-dc` (Subject/Tags).
+*   **Carl’s Catalog:** Note that this is a PDF/RTF and requires OCR/LLM extraction to find the "Photo Number" and "Description."
+</file>
+
+<file path="docs/architecture/omeka-integration.md">
+**Purpose:** Defines how our internal data maps to the Omeka S API.
+*   **Dublin Core Mapping:**
+    *   `Canonical_Title` -> `dcterms:title`
+    *   `Verified_Date` -> `dcterms:date`
+    *   `Synthesized_Description` -> `dcterms:description`
+*   **Resource Templates:** Which Omeka S template to use (e.g., "Family Photograph" vs. "Legal Document").
+</file>
+
+<file path="docs/architecture/prompt-design.md">
+**Purpose:** The "Caging" logic for the LLM to prevent hallucinations.
+*   **Persona:** "Scholarly Archival Assistant."
+*   **Rules:** Never use sentimental language. Only use facts marked as "Verified."
+*   **Visual Analysis:** Instructions on how the VLM should describe clothing, photo process (tintype vs. silver gelatin), and condition.
+</file>
+
+<file path="docs/architecture/workflow.md">
+**Purpose:** Defines the step-by-step path an artifact takes through the app.
+*   **Step 1: Ingest.** Scan folder -> Generate Hash -> Check for existing record.
+*   **Step 2: Reconcile.** AI proposes a link to Carl’s Catalog or Tropy -> Human confirms.
+*   **Step 3: Enrich.** Human transcribes marginalia or corrects dates.
+*   **Step 4: Synthesize.** AI drafts a description based on verified facts.
+*   **Step 5: Publish.** Record is pushed to Omeka S.
+</file>
+
+<file path="frontend/public/favicon.svg">
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="46" fill="none" viewBox="0 0 48 46"><path fill="#863bff" d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z" style="fill:#863bff;fill:color(display-p3 .5252 .23 1);fill-opacity:1"/><mask id="a" width="48" height="46" x="0" y="0" maskUnits="userSpaceOnUse" style="mask-type:alpha"><path fill="#000" d="M25.842 44.938c-.664.844-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.183c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.498 0-3.579-1.842-3.579H1.133c-.92 0-1.456-1.04-.92-1.787L9.91.473c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.578 1.842 3.578h11.377c.943 0 1.473 1.088.89 1.832L25.843 44.94z" style="fill:#000;fill-opacity:1"/></mask><g mask="url(#a)"><g filter="url(#b)"><ellipse cx="5.508" cy="14.704" fill="#ede6ff" rx="5.508" ry="14.704" style="fill:#ede6ff;fill:color(display-p3 .9275 .9033 1);fill-opacity:1" transform="matrix(.00324 1 1 -.00324 -4.47 31.516)"/></g><g filter="url(#c)"><ellipse cx="10.399" cy="29.851" fill="#ede6ff" rx="10.399" ry="29.851" style="fill:#ede6ff;fill:color(display-p3 .9275 .9033 1);fill-opacity:1" transform="matrix(.00324 1 1 -.00324 -39.328 7.883)"/></g><g filter="url(#d)"><ellipse cx="5.508" cy="30.487" fill="#7e14ff" rx="5.508" ry="30.487" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.814 -25.913 -14.639)scale(1 -1)"/></g><g filter="url(#e)"><ellipse cx="5.508" cy="30.599" fill="#7e14ff" rx="5.508" ry="30.599" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.814 -32.644 -3.334)scale(1 -1)"/></g><g filter="url(#f)"><ellipse cx="5.508" cy="30.599" fill="#7e14ff" rx="5.508" ry="30.599" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="matrix(.00324 1 1 -.00324 -34.34 30.47)"/></g><g filter="url(#g)"><ellipse cx="14.072" cy="22.078" fill="#ede6ff" rx="14.072" ry="22.078" style="fill:#ede6ff;fill:color(display-p3 .9275 .9033 1);fill-opacity:1" transform="rotate(93.35 24.506 48.493)scale(-1 1)"/></g><g filter="url(#h)"><ellipse cx="3.47" cy="21.501" fill="#7e14ff" rx="3.47" ry="21.501" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.009 28.708 47.59)scale(-1 1)"/></g><g filter="url(#i)"><ellipse cx="3.47" cy="21.501" fill="#7e14ff" rx="3.47" ry="21.501" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.009 28.708 47.59)scale(-1 1)"/></g><g filter="url(#j)"><ellipse cx=".387" cy="8.972" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(39.51 .387 8.972)"/></g><g filter="url(#k)"><ellipse cx="47.523" cy="-6.092" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 47.523 -6.092)"/></g><g filter="url(#l)"><ellipse cx="41.412" cy="6.333" fill="#47bfff" rx="5.971" ry="9.665" style="fill:#47bfff;fill:color(display-p3 .2799 .748 1);fill-opacity:1" transform="rotate(37.892 41.412 6.333)"/></g><g filter="url(#m)"><ellipse cx="-1.879" cy="38.332" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 -1.88 38.332)"/></g><g filter="url(#n)"><ellipse cx="-1.879" cy="38.332" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 -1.88 38.332)"/></g><g filter="url(#o)"><ellipse cx="35.651" cy="29.907" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 35.651 29.907)"/></g><g filter="url(#p)"><ellipse cx="38.418" cy="32.4" fill="#47bfff" rx="5.971" ry="15.297" style="fill:#47bfff;fill:color(display-p3 .2799 .748 1);fill-opacity:1" transform="rotate(37.892 38.418 32.4)"/></g></g><defs><filter id="b" width="60.045" height="41.654" x="-19.77" y="16.149" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="7.659"/></filter><filter id="c" width="90.34" height="51.437" x="-54.613" y="-7.533" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="7.659"/></filter><filter id="d" width="79.355" height="29.4" x="-49.64" y="2.03" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="e" width="79.579" height="29.4" x="-45.045" y="20.029" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="f" width="79.579" height="29.4" x="-43.513" y="21.178" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="g" width="74.749" height="58.852" x="15.756" y="-17.901" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="7.659"/></filter><filter id="h" width="61.377" height="25.362" x="23.548" y="2.284" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="i" width="61.377" height="25.362" x="23.548" y="2.284" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="j" width="56.045" height="63.649" x="-27.636" y="-22.853" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="k" width="54.814" height="64.646" x="20.116" y="-38.415" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="l" width="33.541" height="35.313" x="24.641" y="-11.323" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="m" width="54.814" height="64.646" x="-29.286" y="6.009" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="n" width="54.814" height="64.646" x="-29.286" y="6.009" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="o" width="54.814" height="64.646" x="8.244" y="-2.416" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="p" width="39.409" height="43.623" x="18.713" y="10.588" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter></defs></svg>
+</file>
+
+<file path="frontend/public/icons.svg">
+<svg xmlns="http://www.w3.org/2000/svg">
+  <symbol id="bluesky-icon" viewBox="0 0 16 17">
+    <g clip-path="url(#bluesky-clip)"><path fill="#08060d" d="M7.75 7.735c-.693-1.348-2.58-3.86-4.334-5.097-1.68-1.187-2.32-.981-2.74-.79C.188 2.065.1 2.812.1 3.251s.241 3.602.398 4.13c.52 1.744 2.367 2.333 4.07 2.145-2.495.37-4.71 1.278-1.805 4.512 3.196 3.309 4.38-.71 4.987-2.746.608 2.036 1.307 5.91 4.93 2.746 2.72-2.746.747-4.143-1.747-4.512 1.702.189 3.55-.4 4.07-2.145.156-.528.397-3.691.397-4.13s-.088-1.186-.575-1.406c-.42-.19-1.06-.395-2.741.79-1.755 1.24-3.64 3.752-4.334 5.099"/></g>
+    <defs><clipPath id="bluesky-clip"><path fill="#fff" d="M.1.85h15.3v15.3H.1z"/></clipPath></defs>
+  </symbol>
+  <symbol id="discord-icon" viewBox="0 0 20 19">
+    <path fill="#08060d" d="M16.224 3.768a14.5 14.5 0 0 0-3.67-1.153c-.158.286-.343.67-.47.976a13.5 13.5 0 0 0-4.067 0c-.128-.306-.317-.69-.476-.976A14.4 14.4 0 0 0 3.868 3.77C1.546 7.28.916 10.703 1.231 14.077a14.7 14.7 0 0 0 4.5 2.306q.545-.748.965-1.587a9.5 9.5 0 0 1-1.518-.74q.191-.14.372-.293c2.927 1.369 6.107 1.369 8.999 0q.183.152.372.294-.723.437-1.52.74.418.838.963 1.588a14.6 14.6 0 0 0 4.504-2.308c.37-3.911-.63-7.302-2.644-10.309m-9.13 8.234c-.878 0-1.599-.82-1.599-1.82 0-.998.705-1.82 1.6-1.82.894 0 1.614.82 1.599 1.82.001 1-.705 1.82-1.6 1.82m5.91 0c-.878 0-1.599-.82-1.599-1.82 0-.998.705-1.82 1.6-1.82.893 0 1.614.82 1.599 1.82 0 1-.706 1.82-1.6 1.82"/>
+  </symbol>
+  <symbol id="documentation-icon" viewBox="0 0 21 20">
+    <path fill="none" stroke="#aa3bff" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.35" d="m15.5 13.333 1.533 1.322c.645.555.967.833.967 1.178s-.322.623-.967 1.179L15.5 18.333m-3.333-5-1.534 1.322c-.644.555-.966.833-.966 1.178s.322.623.966 1.179l1.534 1.321"/>
+    <path fill="none" stroke="#aa3bff" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.35" d="M17.167 10.836v-4.32c0-1.41 0-2.117-.224-2.68-.359-.906-1.118-1.621-2.08-1.96-.599-.21-1.349-.21-2.848-.21-2.623 0-3.935 0-4.983.369-1.684.591-3.013 1.842-3.641 3.428C3 6.449 3 7.684 3 10.154v2.122c0 2.558 0 3.838.706 4.726q.306.383.713.671c.76.536 1.79.64 3.581.66"/>
+    <path fill="none" stroke="#aa3bff" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.35" d="M3 10a2.78 2.78 0 0 1 2.778-2.778c.555 0 1.209.097 1.748-.047.48-.129.854-.503.982-.982.145-.54.048-1.194.048-1.749a2.78 2.78 0 0 1 2.777-2.777"/>
+  </symbol>
+  <symbol id="github-icon" viewBox="0 0 19 19">
+    <path fill="#08060d" fill-rule="evenodd" d="M9.356 1.85C5.05 1.85 1.57 5.356 1.57 9.694a7.84 7.84 0 0 0 5.324 7.44c.387.079.528-.168.528-.376 0-.182-.013-.805-.013-1.454-2.165.467-2.616-.935-2.616-.935-.349-.91-.864-1.143-.864-1.143-.71-.48.051-.48.051-.48.787.051 1.2.805 1.2.805.695 1.194 1.817.857 2.268.649.064-.507.27-.857.49-1.052-1.728-.182-3.545-.857-3.545-3.87 0-.857.31-1.558.8-2.104-.078-.195-.349-1 .077-2.078 0 0 .657-.208 2.14.805a7.5 7.5 0 0 1 1.946-.26c.657 0 1.328.092 1.946.26 1.483-1.013 2.14-.805 2.14-.805.426 1.078.155 1.883.078 2.078.502.546.799 1.247.799 2.104 0 3.013-1.818 3.675-3.558 3.87.284.247.528.714.528 1.454 0 1.052-.012 1.896-.012 2.156 0 .208.142.455.528.377a7.84 7.84 0 0 0 5.324-7.441c.013-4.338-3.48-7.844-7.773-7.844" clip-rule="evenodd"/>
+  </symbol>
+  <symbol id="social-icon" viewBox="0 0 20 20">
+    <path fill="none" stroke="#aa3bff" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.35" d="M12.5 6.667a4.167 4.167 0 1 0-8.334 0 4.167 4.167 0 0 0 8.334 0"/>
+    <path fill="none" stroke="#aa3bff" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.35" d="M2.5 16.667a5.833 5.833 0 0 1 8.75-5.053m3.837.474.513 1.035c.07.144.257.282.414.309l.93.155c.596.1.736.536.307.965l-.723.73a.64.64 0 0 0-.152.531l.207.903c.164.715-.213.991-.84.618l-.872-.52a.63.63 0 0 0-.577 0l-.872.52c-.624.373-1.003.094-.84-.618l.207-.903a.64.64 0 0 0-.152-.532l-.723-.729c-.426-.43-.289-.864.306-.964l.93-.156a.64.64 0 0 0 .412-.31l.513-1.034c.28-.562.735-.562 1.012 0"/>
+  </symbol>
+  <symbol id="x-icon" viewBox="0 0 19 19">
+    <path fill="#08060d" fill-rule="evenodd" d="M1.893 1.98c.052.072 1.245 1.769 2.653 3.77l2.892 4.114c.183.261.333.48.333.486s-.068.089-.152.183l-.522.593-.765.867-3.597 4.087c-.375.426-.734.834-.798.905a1 1 0 0 0-.118.148c0 .01.236.017.664.017h.663l.729-.83c.4-.457.796-.906.879-.999a692 692 0 0 0 1.794-2.038c.034-.037.301-.34.594-.675l.551-.624.345-.392a7 7 0 0 1 .34-.374c.006 0 .93 1.306 2.052 2.903l2.084 2.965.045.063h2.275c1.87 0 2.273-.003 2.266-.021-.008-.02-1.098-1.572-3.894-5.547-2.013-2.862-2.28-3.246-2.273-3.266.008-.019.282-.332 2.085-2.38l2-2.274 1.567-1.782c.022-.028-.016-.03-.65-.03h-.674l-.3.342a871 871 0 0 1-1.782 2.025c-.067.075-.405.458-.75.852a100 100 0 0 1-.803.91c-.148.172-.299.344-.99 1.127-.304.343-.32.358-.345.327-.015-.019-.904-1.282-1.976-2.808L6.365 1.85H1.8zm1.782.91 8.078 11.294c.772 1.08 1.413 1.973 1.425 1.984.016.017.241.02 1.05.017l1.03-.004-2.694-3.766L7.796 5.75 5.722 2.852l-1.039-.004-1.039-.004z" clip-rule="evenodd"/>
+  </symbol>
+</svg>
+</file>
+
+<file path="frontend/src/assets/react.svg">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>
+</file>
+
+<file path="frontend/src/assets/vite.svg">
+<svg xmlns="http://www.w3.org/2000/svg" width="77" height="47" fill="none" aria-labelledby="vite-logo-title" viewBox="0 0 77 47"><title id="vite-logo-title">Vite</title><style>.parenthesis{fill:#000}@media (prefers-color-scheme:dark){.parenthesis{fill:#fff}}</style><path fill="#9135ff" d="M40.151 45.71c-.663.844-2.02.374-2.02-.699V34.708a2.26 2.26 0 0 0-2.262-2.262H24.493c-.92 0-1.457-1.04-.92-1.788l7.479-10.471c1.07-1.498 0-3.578-1.842-3.578H15.443c-.92 0-1.456-1.04-.92-1.788l9.696-13.576c.213-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.472c-1.07 1.497 0 3.578 1.842 3.578h11.376c.944 0 1.474 1.087.89 1.83L40.153 45.712z"/><mask id="a" width="48" height="47" x="14" y="0" maskUnits="userSpaceOnUse" style="mask-type:alpha"><path fill="#000" d="M40.047 45.71c-.663.843-2.02.374-2.02-.699V34.708a2.26 2.26 0 0 0-2.262-2.262H24.389c-.92 0-1.457-1.04-.92-1.788l7.479-10.472c1.07-1.497 0-3.578-1.842-3.578H15.34c-.92 0-1.456-1.04-.92-1.788l9.696-13.575c.213-.297.556-.474.92-.474H53.93c.92 0 1.456 1.04.92 1.788L47.37 13.03c-1.07 1.498 0 3.578 1.842 3.578h11.376c.944 0 1.474 1.088.89 1.831L40.049 45.712z"/></mask><g mask="url(#a)"><g filter="url(#b)"><ellipse cx="5.508" cy="14.704" fill="#eee6ff" rx="5.508" ry="14.704" transform="rotate(269.814 20.96 11.29)scale(-1 1)"/></g><g filter="url(#c)"><ellipse cx="10.399" cy="29.851" fill="#eee6ff" rx="10.399" ry="29.851" transform="rotate(89.814 -16.902 -8.275)scale(1 -1)"/></g><g filter="url(#d)"><ellipse cx="5.508" cy="30.487" fill="#8900ff" rx="5.508" ry="30.487" transform="rotate(89.814 -19.197 -7.127)scale(1 -1)"/></g><g filter="url(#e)"><ellipse cx="5.508" cy="30.599" fill="#8900ff" rx="5.508" ry="30.599" transform="rotate(89.814 -25.928 4.177)scale(1 -1)"/></g><g filter="url(#f)"><ellipse cx="5.508" cy="30.599" fill="#8900ff" rx="5.508" ry="30.599" transform="rotate(89.814 -25.738 5.52)scale(1 -1)"/></g><g filter="url(#g)"><ellipse cx="14.072" cy="22.078" fill="#eee6ff" rx="14.072" ry="22.078" transform="rotate(93.35 31.245 55.578)scale(-1 1)"/></g><g filter="url(#h)"><ellipse cx="3.47" cy="21.501" fill="#8900ff" rx="3.47" ry="21.501" transform="rotate(89.009 35.419 55.202)scale(-1 1)"/></g><g filter="url(#i)"><ellipse cx="3.47" cy="21.501" fill="#8900ff" rx="3.47" ry="21.501" transform="rotate(89.009 35.419 55.202)scale(-1 1)"/></g><g filter="url(#j)"><ellipse cx="14.592" cy="9.743" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(39.51 14.592 9.743)"/></g><g filter="url(#k)"><ellipse cx="61.728" cy="-5.321" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 61.728 -5.32)"/></g><g filter="url(#l)"><ellipse cx="55.618" cy="7.104" fill="#00c2ff" rx="5.971" ry="9.665" transform="rotate(37.892 55.618 7.104)"/></g><g filter="url(#m)"><ellipse cx="12.326" cy="39.103" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 12.326 39.103)"/></g><g filter="url(#n)"><ellipse cx="12.326" cy="39.103" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 12.326 39.103)"/></g><g filter="url(#o)"><ellipse cx="49.857" cy="30.678" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 49.857 30.678)"/></g><g filter="url(#p)"><ellipse cx="52.623" cy="33.171" fill="#00c2ff" rx="5.971" ry="15.297" transform="rotate(37.892 52.623 33.17)"/></g></g><path d="M6.919 0c-9.198 13.166-9.252 33.575 0 46.789h6.215c-9.25-13.214-9.196-33.623 0-46.789zm62.424 0h-6.215c9.198 13.166 9.252 33.575 0 46.789h6.215c9.25-13.214 9.196-33.623 0-46.789" class="parenthesis"/><defs><filter id="b" width="60.045" height="41.654" x="-5.564" y="16.92" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="7.659"/></filter><filter id="c" width="90.34" height="51.437" x="-40.407" y="-6.762" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="7.659"/></filter><filter id="d" width="79.355" height="29.4" x="-35.435" y="2.801" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="e" width="79.579" height="29.4" x="-30.84" y="20.8" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="f" width="79.579" height="29.4" x="-29.307" y="21.949" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="g" width="74.749" height="58.852" x="29.961" y="-17.13" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="7.659"/></filter><filter id="h" width="61.377" height="25.362" x="37.754" y="3.055" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="i" width="61.377" height="25.362" x="37.754" y="3.055" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="j" width="56.045" height="63.649" x="-13.43" y="-22.082" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="k" width="54.814" height="64.646" x="34.321" y="-37.644" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="l" width="33.541" height="35.313" x="38.847" y="-10.552" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="m" width="54.814" height="64.646" x="-15.081" y="6.78" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="n" width="54.814" height="64.646" x="-15.081" y="6.78" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="o" width="54.814" height="64.646" x="22.45" y="-1.645" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="p" width="39.409" height="43.623" x="32.919" y="11.36" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter></defs></svg>
+</file>
+
+<file path="frontend/src/App.css">
+.counter {
+  font-size: 16px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 2px solid transparent;
+  transition: border-color 0.3s;
+  margin-bottom: 24px;
+
+  &:hover {
+    border-color: var(--accent-border);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+.hero {
+  position: relative;
+
+  .base,
+  .framework,
+  .vite {
+    inset-inline: 0;
+    margin: 0 auto;
+  }
+
+  .base {
+    width: 170px;
+    position: relative;
+    z-index: 0;
+  }
+
+  .framework,
+  .vite {
+    position: absolute;
+  }
+
+  .framework {
+    z-index: 1;
+    top: 34px;
+    height: 28px;
+    transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg)
+      scale(1.4);
+  }
+
+  .vite {
+    z-index: 0;
+    top: 107px;
+    height: 26px;
+    width: auto;
+    transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg)
+      scale(0.8);
+  }
+}
+
+#center {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+  place-content: center;
+  place-items: center;
+  flex-grow: 1;
+
+  @media (max-width: 1024px) {
+    padding: 32px 20px 24px;
+    gap: 18px;
+  }
+}
+
+#next-steps {
+  display: flex;
+  border-top: 1px solid var(--border);
+  text-align: left;
+
+  & > div {
+    flex: 1 1 0;
+    padding: 32px;
+    @media (max-width: 1024px) {
+      padding: 24px 20px;
+    }
+  }
+
+  .icon {
+    margin-bottom: 16px;
+    width: 22px;
+    height: 22px;
+  }
+
+  @media (max-width: 1024px) {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+
+#docs {
+  border-right: 1px solid var(--border);
+
+  @media (max-width: 1024px) {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+#next-steps ul {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  gap: 8px;
+  margin: 32px 0 0;
+
+  .logo {
+    height: 18px;
+  }
+
+  a {
+    color: var(--text-h);
+    font-size: 16px;
+    border-radius: 6px;
+    background: var(--social-bg);
+    display: flex;
+    padding: 6px 12px;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    transition: box-shadow 0.3s;
+
+    &:hover {
+      box-shadow: var(--shadow);
+    }
+    .button-icon {
+      height: 18px;
+      width: 18px;
+    }
+  }
+
+  @media (max-width: 1024px) {
+    margin-top: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+
+    li {
+      flex: 1 1 calc(50% - 8px);
+    }
+
+    a {
+      width: 100%;
+      justify-content: center;
+      box-sizing: border-box;
+    }
+  }
+}
+
+#spacer {
+  height: 88px;
+  border-top: 1px solid var(--border);
+  @media (max-width: 1024px) {
+    height: 48px;
+  }
+}
+
+.ticks {
+  position: relative;
+  width: 100%;
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    top: -4.5px;
+    border: 5px solid transparent;
+  }
+
+  &::before {
+    left: 0;
+    border-left-color: var(--border);
+  }
+  &::after {
+    right: 0;
+    border-right-color: var(--border);
+  }
+}
+</file>
+
+<file path="frontend/src/App.tsx">
+import { useState } from 'react'
+import reactLogo from './assets/react.svg'
+import viteLogo from './assets/vite.svg'
+import heroImg from './assets/hero.png'
+import './App.css'
+
+function App() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <section id="center">
+        <div className="hero">
+          <img src={heroImg} className="base" width="170" height="179" alt="" />
+          <img src={reactLogo} className="framework" alt="React logo" />
+          <img src={viteLogo} className="vite" alt="Vite logo" />
+        </div>
+        <div>
+          <h1>Get started</h1>
+          <p>
+            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
+          </p>
+        </div>
+        <button
+          type="button"
+          className="counter"
+          onClick={() => setCount((count) => count + 1)}
+        >
+          Count is {count}
+        </button>
+      </section>
+
+      <div className="ticks"></div>
+
+      <section id="next-steps">
+        <div id="docs">
+          <svg className="icon" role="presentation" aria-hidden="true">
+            <use href="/icons.svg#documentation-icon"></use>
+          </svg>
+          <h2>Documentation</h2>
+          <p>Your questions, answered</p>
+          <ul>
+            <li>
+              <a href="https://vite.dev/" target="_blank">
+                <img className="logo" src={viteLogo} alt="" />
+                Explore Vite
+              </a>
+            </li>
+            <li>
+              <a href="https://react.dev/" target="_blank">
+                <img className="button-icon" src={reactLogo} alt="" />
+                Learn more
+              </a>
+            </li>
+          </ul>
+        </div>
+        <div id="social">
+          <svg className="icon" role="presentation" aria-hidden="true">
+            <use href="/icons.svg#social-icon"></use>
+          </svg>
+          <h2>Connect with us</h2>
+          <p>Join the Vite community</p>
+          <ul>
+            <li>
+              <a href="https://github.com/vitejs/vite" target="_blank">
+                <svg
+                  className="button-icon"
+                  role="presentation"
+                  aria-hidden="true"
+                >
+                  <use href="/icons.svg#github-icon"></use>
+                </svg>
+                GitHub
+              </a>
+            </li>
+            <li>
+              <a href="https://chat.vite.dev/" target="_blank">
+                <svg
+                  className="button-icon"
+                  role="presentation"
+                  aria-hidden="true"
+                >
+                  <use href="/icons.svg#discord-icon"></use>
+                </svg>
+                Discord
+              </a>
+            </li>
+            <li>
+              <a href="https://x.com/vite_js" target="_blank">
+                <svg
+                  className="button-icon"
+                  role="presentation"
+                  aria-hidden="true"
+                >
+                  <use href="/icons.svg#x-icon"></use>
+                </svg>
+                X.com
+              </a>
+            </li>
+            <li>
+              <a href="https://bsky.app/profile/vite.dev" target="_blank">
+                <svg
+                  className="button-icon"
+                  role="presentation"
+                  aria-hidden="true"
+                >
+                  <use href="/icons.svg#bluesky-icon"></use>
+                </svg>
+                Bluesky
+              </a>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <div className="ticks"></div>
+      <section id="spacer"></section>
+    </>
+  )
+}
+
+export default App
+</file>
+
+<file path="frontend/src/index.css">
+:root {
+  --text: #6b6375;
+  --text-h: #08060d;
+  --bg: #fff;
+  --border: #e5e4e7;
+  --code-bg: #f4f3ec;
+  --accent: #aa3bff;
+  --accent-bg: rgba(170, 59, 255, 0.1);
+  --accent-border: rgba(170, 59, 255, 0.5);
+  --social-bg: rgba(244, 243, 236, 0.5);
+  --shadow:
+    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+
+  font: 18px/145% var(--sans);
+  letter-spacing: 0.18px;
+  color-scheme: light dark;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  @media (max-width: 1024px) {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #9ca3af;
+    --text-h: #f3f4f6;
+    --bg: #16171d;
+    --border: #2e303a;
+    --code-bg: #1f2028;
+    --accent: #c084fc;
+    --accent-bg: rgba(192, 132, 252, 0.15);
+    --accent-border: rgba(192, 132, 252, 0.5);
+    --social-bg: rgba(47, 48, 58, 0.5);
+    --shadow:
+      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+  }
+
+  #social .button-icon {
+    filter: invert(1) brightness(2);
+  }
+}
+
+#root {
+  width: 1126px;
+  max-width: 100%;
+  margin: 0 auto;
+  text-align: center;
+  border-inline: 1px solid var(--border);
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+h1,
+h2 {
+  font-family: var(--heading);
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+h1 {
+  font-size: 56px;
+  letter-spacing: -1.68px;
+  margin: 32px 0;
+  @media (max-width: 1024px) {
+    font-size: 36px;
+    margin: 20px 0;
+  }
+}
+h2 {
+  font-size: 24px;
+  line-height: 118%;
+  letter-spacing: -0.24px;
+  margin: 0 0 8px;
+  @media (max-width: 1024px) {
+    font-size: 20px;
+  }
+}
+p {
+  margin: 0;
+}
+
+code,
+.counter {
+  font-family: var(--mono);
+  display: inline-flex;
+  border-radius: 4px;
+  color: var(--text-h);
+}
+
+code {
+  font-size: 15px;
+  line-height: 135%;
+  padding: 4px 8px;
+  background: var(--code-bg);
+}
+</file>
+
+<file path="frontend/src/main.tsx">
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import App from './App.tsx'
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
+</file>
+
+<file path="frontend/eslint.config.js">
+import js from '@eslint/js'
+import globals from 'globals'
+import reactHooks from 'eslint-plugin-react-hooks'
+import reactRefresh from 'eslint-plugin-react-refresh'
+import tseslint from 'typescript-eslint'
+import { defineConfig, globalIgnores } from 'eslint/config'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      js.configs.recommended,
+      tseslint.configs.recommended,
+      reactHooks.configs.flat.recommended,
+      reactRefresh.configs.vite,
+    ],
+    languageOptions: {
+      globals: globals.browser,
+    },
+  },
+])
+</file>
+
+<file path="frontend/index.html">
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>frontend</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+</file>
+
+<file path="frontend/package.json">
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "eslint": "^10.6.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "globals": "^17.7.0",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.62.0",
+    "vite": "^8.1.1"
+  }
+}
+</file>
+
+<file path="frontend/README.md">
+# React + TypeScript + Vite
+
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+
+Currently, two official plugins are available:
+
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+
+## React Compiler
+
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+
+## Expanding the ESLint configuration
+
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+
+```js
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+
+      // Remove tseslint.configs.recommended and replace with this
+      tseslint.configs.recommendedTypeChecked,
+      // Alternatively, use this for stricter rules
+      tseslint.configs.strictTypeChecked,
+      // Optionally, add this for stylistic rules
+      tseslint.configs.stylisticTypeChecked,
+
+      // Other configs...
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+
+```
+
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+      // Enable lint rules for React
+      reactX.configs['recommended-typescript'],
+      // Enable lint rules for React DOM
+      reactDom.configs.recommended,
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+
+```
+</file>
+
+<file path="frontend/tsconfig.app.json">
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "target": "es2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "esnext",
+    "types": ["vite/client"],
+    "allowArbitraryExtensions": true,
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Linting */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"]
+}
+</file>
+
+<file path="frontend/tsconfig.json">
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}
+</file>
+
+<file path="frontend/tsconfig.node.json">
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "target": "es2023",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "module": "nodenext",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["vite.config.ts"]
+}
+</file>
+
+<file path="frontend/vite.config.ts">
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [react()],
+})
+</file>
+
+<file path="LICENSE">
+MIT License
+
+Copyright (c) 2026 Liz
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+</file>
+
+<file path="README.md">
+# Archive Workbench
+
+## Purpose
+
+Archive Workbench is a curation environment designed to bring together digital assets, research notes, metadata, artificial intelligence, and publication into a single coherent workflow. It is not another cataloging system but serves as the curator's workspace where archival materials are verified, enriched, documented, and prepared before publication.
+
+## Vision
+
+Archives often require information from many independent systems. Digital asset managers, research notebooks, spreadsheets, and JSON exports all house different parts of an archive. Public access may be provided through systems such as Omeka S. Archive Workbench aims to bridge the gaps between these systems, coordinating them rather than replacing them.
+
+## Mission Statement
+
+Provide historians, genealogists, archivists, museums, and cultural heritage organizations with a workflow that transforms scattered research and digital assets into verified, publishable archival records.
+
+## Guiding Principles
+
+- **Human First**: The human curator is always the authority. Automation exists to reduce repetitive work but should never obscure important decisions. Every AI-generated description requires human approval.
+- **Archive First**: Version 1 is optimized for the Haushalter-Casler Family Archive. Generalization is encouraged only when it naturally emerges from solving real archival problems. Premature abstraction is avoided.
+
+## Scope
+
+Archive Workbench is responsible for:
+- Importing metadata
+- Importing digital assets
+- Importing research
+- Validating records
+- Assisting historical description writing
+- Preparing records for publication
+- Uploading approved records to Omeka S
+- Tracking workflow progress
+
+Archive Workbench is not responsible for:
+- Long-term digital preservation
+- Image editing
+- Transcription software
+- Digital asset management
+- Replacing Omeka S
+- Replacing Obsidian
+- Replacing DigiKam
+
+## Primary Workflow
+
+1. Create Project
+2. Import Sources
+   - Images
+   - Documents
+   - Metadata
+   - Research Notes
+3. Validate Records: Ensure that all imported records are accurate and complete.
+4. Assist Historical Description Writing: Use AI to help write historical descriptions.
+5. Prepare Records for Publication: Ensure all records are ready for publication.
+6. Upload Approved Records to Omeka S: Publish the collection to Omeka S.
+7. Track Workflow Progress: Monitor the progress of each task.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE.md file for details.
+</file>
+
+<file path="docs/architecture/architecture.md">
+## 1. System Overview
+Archive Workbench is a "Staging Area" application designed to reconcile fragmented archival data. It acts as a middleware between raw digital assets (scans), legacy research (catalogs, notes, Tropy), and the public-facing repository (Omeka S). It prioritizes **Evidence Before Narrative** and uses **Deterministic Integrity** for file identity.
+
+## 2. Logical Layers
+
+### A. Ingestion Layer (The "Harvester")
+*   **File Watcher:** Recursively scans directories, generates SHA-256 hashes, and registers `DigitalAssets`.
+*   **Metadata Adapters:**
+    *   **Structured Adapters:** Parses SQLite (Tropy), API/DB (Immich), and XMP/Sidecars (DigiKam).
+    *   **Document Parser:** Uses local ROCm LLM to extract structured data from unstructured legacy text.
+
+### B. Reconciliation Layer (The "Matchmaker")
+*   **Identity Resolver:**
+    1.  **Level 1 (Exact):** Matches by SHA-256 hash. **Status: Auto-Confirmed.**
+    2.  **Level 2 (Identifier):** Matches by strings in filenames or metadata. **Status: Pending Review.**
+    3.  **Level 3 (Visual):** Uses local VLM (ROCm) to suggest matches between legacy and high-res scans. **Status: Pending Review.**
+*   **Verification Gate:** Mandatory human review for all Level 2 and Level 3 proposals.
+*   **Conflict Manager:** Flags disparate descriptions from different sources for human resolution.
+
+### C. Curation Layer (The "Workbench")
+*   **Evidence Aggregator:** Groups all `EvidenceClaims` under a single `ArchivalItem`.
+*   **Synthesis Engine:**
+    *   **Local AI (OCR/VLM):** Transcribes marginalia and identifies visual features.
+    *   **Prose Assistant:** Generates Dublin Core descriptions from "Verified" evidence.
+
+### D. Publication Layer (The "Bridge")
+*   **Omeka S Sync:** Maps the Workbench `ArchivalItem` to Omeka S `Items`.
+*   **Media Manager:** Uploads the `Primary_Asset` to the Omeka S API.
+
+---
+
+## 3. Data Model Sketch (Entity-Relationship)
+
+```mermaid
+erDiagram
+    ARCHIVAL_ITEM ||--o{ DIGITAL_ASSET : "represented by"
+    ARCHIVAL_ITEM ||--o{ EVIDENCE_CLAIM : "described by"
+    ARCHIVAL_ITEM }|--o{ AUTHORITY_LINK : "references"
+
+    DIGITAL_ASSET {
+        string sha256 PK
+        string file_path
+        enum asset_role "Primary, Reference, Back"
+        enum link_verification "Auto_Confirmed, Pending, Rejected"
+        jsonb technical_metadata
+    }
+
+    ARCHIVAL_ITEM {
+        uuid id PK
+        jsonb external_identifiers "Legacy IDs"
+        jsonb physical_address "Bin, Folder, Box"
+        enum status "Draft, Verified, Published"
+        jsonb canonical_metadata "Final Dublin Core"
+    }
+
+    EVIDENCE_CLAIM {
+        uuid id PK
+        uuid item_id FK
+        jsonb source_context "Origin"
+        string property "Field"
+        text value
+        boolean is_verified
+    }
+
+    AUTHORITY_LINK {
+        uuid id PK
+        string system_name "WikiTree, Obsidian, etc"
+        string system_id "External ID"
+        string uri "Link"
+    }
+```
+
+---
+
+## 4. Key Logic Flows
+
+### The "Healing" Flow (Hybrid)
+1.  **Input:** New scan `A`.
+2.  **Hash Check:** If `A.hash` exists in DB, link immediately as `Auto_Confirmed`.
+3.  **Visual Check:** If no hash match, compare `A` against `Reference_Assets`.
+4.  **Proposal:** If visual similarity > 90%, create a `Pending` link to the Item.
+5.  **Review:** Curator confirms or rejects the `Pending` visual match.
+
+### The "Evidence Synthesis" Flow
+1.  **Display:** Workbench shows an image and its aggregated `EvidenceClaims`.
+2.  **Action:** Curator selects/edits the most accurate claims.
+3.  **Result:** Values are promoted to `Canonical_Metadata`.
+
+### Flow 3: The Narrative Synthesis Flow (Fact + Vision to Story)
+
+1.  **Trigger:** Curator requests a "Draft Description" for an item.
+2.  **Context Assembly:** System pulls:
+    *   All **Verified** `EvidenceClaims` (People, Dates, Locations, Transcriptions).
+    *   Relevant **AuthorityLink** summaries (e.g., "Mary Haushalter (1888–1974), daughter of...").
+    *   The **Primary_Asset** (the high-res scan) for visual analysis.
+3.  **Prompting:** System sends this context to the Prose Assistant with a "Scholarly Observer" persona.
+    *   **Instruction:** "Draft a public-facing archival description in a single, cohesive paragraph. Synthesize the provided metadata with objective visual evidence visible in the image (e.g., clothing style, architectural details, photographic process, physical condition).
+    *   **Constraints:**
+        *   **Tone:** Neutral, scholarly, and descriptive.
+        *   **Prohibited:** No sentimental filler (e.g., 'a glimpse into the past', 'heartwarming'), no speculative narrative, and no 'AI-isms' (e.g., 'the photo captures...').
+        *   **Certainty:** Only include visual conclusions that are certain. If a detail is ambiguous, describe it as such or omit it."
+4.  **Drafting:** System stores the output in a `Draft_Description` field.
+5.  **Editorial Review:** Curator reviews the draft.
+    *   **Edit:** Curator refines the scholarly tone or corrects visual misinterpretations.
+    *   **Approve:** Text is moved to `Canonical_Metadata` (Dublin Core: Description).
+6.  **Final State:** Item status moves to `Ready for Publication`.
+
+---
+
+## 5. Technology Stack
+*   **Backend:** Python (FastAPI)
+*   **Database:** PostgreSQL with JSONB
+*   **AI:** Ollama/ROCm (Local)
+*   **Frontend:** React/TypeScript
+*   **Task Queue:** Celery/Redis
+
+---
+We can conclude Phase 0 here. A clean, modular folder structure is essential for a "Staging Area" project, as it needs to separate the **Ingestion** (getting data in), **Logic** (reconciling it), and **Publication** (getting it out).
+
+Since we are using **FastAPI** (Backend), **React/TypeScript** (Frontend), and **Celery/Redis** (Workers), I recommend the following structure for your repository:
+
+### Recommended Folder Structure: `archive-workbench/`
+
+```text
+archive-workbench/
+├── backend/                # FastAPI Application
+│   ├── app/
+│   │   ├── api/            # API Endpoints (Items, Assets, Evidence)
+│   │   ├── core/           # Config, Security, Hashing Logic
+│   │   ├── crud/           # DB Operations
+│   │   ├── models/         # SQLAlchemy/SQLModel (The Schema we designed)
+│   │   ├── schemas/        # Pydantic models for API validation
+│   │   ├── services/       # Business Logic (The "Matchmaker" & "Synthesizer")
+│   │   │   ├── adapters/   # Tropy, Immich, DigiKam, Carl's Catalog
+│   │   │   ├── ai/         # ROCm/Ollama integration & Prompt Templates
+│   │   │   └── omeka/      # Omeka S API Bridge
+│   │   └── db/             # Migrations (Alembic) and Session management
+│   ├── main.py             # Entry point
+│   └── requirements.txt
+├── frontend/               # React/TypeScript Application
+│   ├── src/
+│   │   ├── components/     # Curation View, Evidence Sidebar, Matchmaker UI
+│   │   ├── hooks/          # API interaction hooks
+│   │   ├── store/          # State management (Zustand/Redux)
+│   │   └── types/          # TypeScript interfaces matching the Schema
+│   ├── package.json
+│   └── tsconfig.json
+├── workers/                # Background Tasks (Celery/Redis)
+│   ├── tasks/
+│   │   ├── hashing.py      # SHA-256 generation
+│   │   └── vision.py       # ROCm-accelerated VLM/OCR tasks
+│   └── worker.py
+├── data/                   # Local Staging (Git-ignored)
+│   ├── raw/                # Symlinks or copies of original scans
+│   └── exports/            # Prepared JSON for Omeka S
+├── docs/                   # Documentation
+│   ├── architecture/       # The v1.0 Document and ERDs
+│   ├── hierarchy/          # Physical Finding Aid (Series/Box/Folder)
+│   └── api/                # API Specs
+├── docker-compose.yml      # Orchestration for Postgres, Redis, and App
+├── .gitignore              # Crucial: Ignore large assets and DB files
+└── README.md
+```
+</file>
+
+<file path="docs/architecture/roadmap.md">
+# Archive Workbench: Unified Master Roadmap
+
+## Phase 1: Skeleton Application (Proving the Stack)
+*Goal: Establish communication between your GPU Workstation and Proxmox.*
+- [ ] **Backend:** Initialize FastAPI (Python) with a "Hello World" endpoint.
+- [ ] **Database:** Connect FastAPI to the PostgreSQL instance on Proxmox.
+- [ ] **Frontend:** Confirm Vite/React can fetch data from the Backend.
+- [ ] **Infrastructure:** Confirm Redis is reachable for background tasks.
+- **Result:** You have a dashboard that says "Connection Successful."
+
+## Phase 2: Project & Environment Management
+*Goal: Make the tool reusable and configurable.*
+- [ ] **Project Schema:** Define settings for "The Fifty Acres" (Image Dir, Tropy Path, Omeka Credentials).
+- [ ] **Environment Check:** UI indicator for ROCm/GPU status (is the 7800 XT detected?).
+- **Result:** You can select the "Haushalter Casler Archive" project.
+
+## Phase 3: The Harvester (Database & Ingestion)
+*Goal: Move from "Files" to "Digital Assets" using Deterministic Integrity.*
+- [ ] **The Real Data Model:** Deploy the `ArchivalItem`, `DigitalAsset`, and `EvidenceClaim` schema.
+- [ ] **The Hash Crawler:** Implement the service that scans your local directories and assigns SHA-256 IDs.
+- [ ] **Initial Importers:** Build the "Adapters" for Tropy (SQLite) and DigiKam (XMP).
+- **Result:** The database is populated with "Digital Assets" linked to their first "Evidence Claims."
+
+## Phase 4: The Matchmaker (Reconciliation & Validation)
+*Goal: Solve the "Rescan Problem" and validate data.*
+- [ ] **Level 1 Match:** Auto-link assets with identical hashes.
+- [ ] **Level 2/3 Match:** Build the UI to review "Proposed" matches based on Sleeve IDs or Visual Similarity (ROCm).
+- [ ] **Validation Engine:** Flag missing images, duplicate IDs, or orphaned sidecars.
+- **Result:** Your high-res scans are now correctly linked to your legacy Tropy/Carl metadata.
+
+## Phase 5: The Workbench (Curation & Relationships)
+*Goal: Human-in-the-loop synthesis of evidence.*
+- [ ] **Review Interface:** The "Major UI" showing Image + Metadata + Historical Notes.
+- [ ] **Relationship Builder:** Link Items to People (WikiTree/Obsidian) and Places.
+- [ ] **Marginalia Pipeline:** Link "Back-of-Photo" scans and run local OCR.
+- **Result:** You have "Verified" archival records ready for description.
+
+## Phase 6: The Synthesizer (AI Integration)
+*Goal: Generate public-facing narratives from verified facts.*
+- [ ] **Prompt Builder:** Logic to feed "Verified Claims" into the LLM.
+- [ ] **AI Generation:** ROCm-accelerated drafting of descriptions and alt-text.
+- [ ] **Editorial Review:** UI to Approve, Edit, or Reject AI-generated content.
+- **Result:** Every item has a scholarly, public-facing description.
+
+## Phase 7: The Bridge (Omeka S Integration)
+*Goal: Publication and Verification.*
+- [ ] **Omeka Client:** Map Workbench records to Dublin Core and push via API.
+- [ ] **Media Uploader:** Push high-res files to the Omeka server.
+- [ ] **Verification:** Compare the local database against the live Omeka site to ensure 1:1 parity.
+- **Result:** The archive is live and verified.
+</file>
+
+<file path="docs/hierarchy/finding-aid.md">
+# Haushalter-Casler Archive Finding Aid
+
+## Collection Overview
+
+**Date range:** 1866–2021 (Bulk dates: 1906–1999)
+
+**Finding Aid Created By:** Elizabeth Casler Loomans, 2025
+
+**Archive Created By:** June Haushalter Casler
+
+**Extent:** 1 Archival File Box, 3 Archival Photo Boxes, 3 Storage Bins, 1 Apple Box, Oversized loose volumes, and 7 Standalone Material Artifacts / Family Heirloom Volumes.
+
+**Abstract:** The Haushalter and Casler family records include photographs, correspondence, legal documents, military service files, regional histories, and ephemera documenting life on the 50-acre family farm in Hamburg, NY, the local history of Water Valley, and subsequent generations across the 20th century.
+
+**Repository:** The Haushalter-Casler Family Archive, Private Collection (Cincinnati, OH)
+
+**Access Restrictions:** The physical collection is housed in a private repository. Access is available to qualified researchers and academic affiliates by prior appointment only.
+
+**Copy & Consultation Note:** Digital surrogates of processed materials can be provided upon request. For consultations regarding un-digitized physical items, arrangements may be made for on-site review or supervised access at a mutually agreed-upon local public venue (such as a library or local meeting space) following credential verification. Please use the site contact form to submit a research proposal.
+
+**Language:** The material is primarily in English, with select historical volumes and certificates in German.
+
+**Acquisition Information:** The Haushalter–Casler Family Papers comprise a multi-accession family archive unified by continuous family custody and a place-based narrative anchored in a single farm property held by interrelated families for over 150 years.
+
+- **Accession 1**: Consists primarily of photographic materials (circa 1880–early 2000s) documenting family life and farm landscapes, with supporting documents, organized by the donor following the death of June Haushalter Casler.
+
+- **Accession 2**: Forms the documentary core of the collection, adding original land, estate, military, and community records assembled by June Haushalter Casler (including the 2026 integration of the John Casler papers and digital photo proxies from Carl Haushalter's estate records).
+
+- **Accession 3** (Anticipated): Consists of approximately twenty-five (25) handwritten World War II letters authored by Glenn Haushalter, providing an intimate first-person narrative closely tied to existing materials.
+
+
+## Processing Status & Archival Note
+
+This finding aid reflects two operational states within the repository:
+
+1. **Processed Core (Box 1 & Photo Boxes 2–4):** Items housed in Box 1 and Photo Boxes 2–4 represent fully verified physical holdings. As of July 2026, it includes only the items from Accession 1.
+
+2. **Unprocessed Accessions (Bins 4, 11, and Apple Box):** Items listed under Bins 4, 11, and the Apple Box represent un-foldered materials remaining in raw accession containers as received from the John Casler papers.
+
+3. **Deaccessioned & Digital Proxy Status (Carl Haushalter Papers):** The physical container known as "Carl's Box" has been transferred to Carl's son. Non-personal family photos/documents retained from the box are noted below, while historically relevant items pertaining to Carl's career and the farm are maintained exclusively as digital scan proxies with family permission.
+
+**Note on Organization:** Items are conceptually categorized under intellectual thematic subseries. Physical container citations reflect their actual current storage (e.g., `Box 1`, `Bin 11, Unprocessed`, or `Digital Proxy`). Folder numbers will be assigned only upon final physical processing.
+
+## Historical Note
+
+The Haushalter family lived and worked on the same land in Hamburg, New York for 152 years. The original 50 acres was sold to Jacob Haushalter in 1856 by his father-in-law, Daniel Schweikhart. In 2008, June Haushalter Casler sold the final remaining acres of the homestead following the death of her husband, Edwin Casler. These records were collected by June over the course of many years, with the bulk of the historical contents handed down to her by prior generations, alongside later documents and photographs relating to the Casler family after her marriage to Edwin.
+
+## Scope and Content Note
+
+The collection consists of photographs, legal and personal documents, volumes, ephemera, and photo negatives. Following the 2026 accession from the John Casler papers, the collection has been re-processed into a unified structure focusing strictly on the lineage, the homestead, and family military service.
+
+The collection is organized into five distinct series based on format, theme, and content:
+
+- **Series I: Documents and Ephemera:** Correspondence, personal written recollections, legal papers regarding the farm, newspaper clippings, and commemorative ribbons.
+
+- Subseries A: Core Household & Property Records
+
+- Subseries B: Water Valley Regional History
+
+- Subseries C: 20th-Century Military & Wartime Service
+
+- Subseries D: John Casler Career History
+
+
+- **Series II: Books and Volumes:** Family record books, regional history texts, personal religious texts, and celebration guest books.
+
+- **Series III: Photographs:** Loose and cardboard-backed prints spanning circa 1866 to 2003, including farm views, family portraits, and digital scan proxies of Carl Haushalter's personal collection related to his career.
+
+- **Series IV: Photo Negatives:** A small collection of mid-twentieth-century negatives.
+
+- **Series V: Realia and Artifacts:** Standalone family heirlooms, fine art marquetry, and material culture implements associated with the family lineage.
+
+
+## Inventory & Container Map
+
+### Series I: Documents and Ephemera
+
+**Box 1 Document Folders:**
+
+1. Lyrics to Birthday Party for the Caslers song with handwritten note by June Haushalter Casler, 1998
+
+2. Letter from Fred Haushalter and wife Millie to his siblings, 1959
+
+3. Von Sickingen genealogical connection research by unknown family member
+
+4. Documents pertaining to Charles and Anna Stunick Haushalter
+
+5. Documents pertaining to June Haushalter Casler as well as some of her personal recollections of others
+
+6. Documents related to farm legal issues
+
+7. Newspaper clippings about George Haushalter
+
+8. Documents pertaining to James (Jim) Casler
+
+9. Charles (Charley) Edwin Casler’s personal recollection of visiting the farm.
+
+10. Patricia (Pat) Casler’s personal recollection of her grandfather, Charles Haushalter.
+
+11. Remembrances of the life and death of Doris Haushalter Agle.
+
+12. Personal written accounts of various events by Carl Haushalter.
+
+13. Documents pertaining to various other Haushalters.
+
+
+**Box 1 Fabric:**
+
+- Prize ribbon for Charles Haushalter's barred rock chickens.
+
+- 1921 Flower City Show Poultry & Pigeon Association first prize ribbon, presumed to belong to Charles Haushalter.
+
+- Anna Haushalter’s 1892 Columbus Day celebration ribbon.
+
+## Series II: Books and Volumes
+
+**Box 1 Books:**
+
+- Small brown book in German language with written inscription to “Carl” Haushalter, 1894
+
+- Guest book from June Haushalter Casler and Edwin Casler’s 50th wedding anniversary celebration, 1993
+
+- German calligraphy practice book of “Carl” Haushalter, 1893
+
+- Commemorative wedding book from marriage of Anna Stunick and Charles Haushalter, 1912
+
+## Series III: Photographs
+
+**Box 2:** Larger Photographic Prints
+
+**Box 3:** Smaller Photographic Prints
+
+**Box 4:** Cardboard-Backed Photographic Prints
+
+## Series IV: Photo Negatives
+
+**Box 1:** Medium-format acetate negatives depicting farm outbuildings and fields (circa 1950s).
+
+## Series V: Realia and Material Culture
+
+**Freestanding Heirloom Artifacts**
+
+- Charles "Charley" Haushalter Logging Saw (1900–1907) — Two-man steel crosscut logging saw utilized in Idaho timber operations.
+
+- Carl Haushalter Cherry Wood Coffee Table — Solid cherry coffee table constructed from timber harvested directly on the farm.
+
+- Carl Haushalter Marquetry Work Panels — Three specimens of fine-art wood inlay.
+
+- Master-Catalog File & Inventory Disks — Paper item inventories, metadata notes, and digital storage disks returned to June Casler tracking early family archival passes. Retained for administrative provenance.
+
+## Unprocessed Materials
+
+### Bin 4
+This container primarily holds modern family, educational, and professional records, alongside personal ephemera belonging mostly to Liz and John Casler. Its contents range from childhood mementos, school photos, and college transcripts to career documents, legal paperwork, travel guides, and household correspondence. Among these personal items, a few objects hold specific historical interest, including an unused Kennedy-Johnson presidential campaign bumper sticker, transcribed notes from a conversation with Jack Casler reflecting on his World War II experiences, and official government or legal papers such as sealed Bar admission documents and a confidential Bath Ironworks memorandum.
+
+### Bin 11
+Serving as a substantial genealogical and regional archive, this container is filled with vital family records, legal deeds, correspondence, and extensive local history documentation regarding Water Valley and Eighteen Mile Creek for the Haushalter, Casler, Stunick, and Thomas families. Notable items of key historical significance include World War I ephemera, war bonds, and correspondence belonging to Anna and Minnie Stunick; detailed World War II military records, ration books, and service notes for multiple family members; an FDR recognition certificate for Glenn Haushalter; a December 30, 1939 front-page issue of the _Buffalo Evening News_ featuring Adolf Hitler; a full January 13, 1944 issue of the _Erie County Independent_; and historical clippings detailing a local Water Valley manufacturer that produced wooden presentation boxes for Purple Hearts.
+
+### Apple Box
+This container serves as a compact collection dedicated strictly to mid-20th-century historical print media and journalism. Its contents consist of original Buffalo-area newspaper issues bearing major front-page headlines from critical historical moments—including World War II, the Vietnam War, and the Space Race—as well as a curated selection of _Time Magazine_ issues published during World War II.
+
+### Carl’s Bin
+This container functions mainly as a visual and photographic archive, containing family photo albums, loose vacation snapshots spanning several decades, travel brochures, and personal mementos associated with Carl Haushalter and his relatives. Specific items of notable historical value stored within the bin include original Air Force base photographs, a copy of the July 21, 1969 _New York Times_ front-page cover story detailing the Apollo 11 moonwalk, and a formal 2003 Stage 1 Cultural Resource Investigation report conducted for the family farm. The bin also contains many photos and documents relating to Carl's career, specifically his work with McDonnell-Douglas and the United States Space Program.
+</file>
+
+<file path=".gitignore">
+# Python
+.venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Database
+*.sqlite3
+*.db
+
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Directory for instrumented libs generated by jscoverage/JSCover
+lib-cov
+
+# Coverage directory used by tools like istanbul
+coverage
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
+.grunt
+
+# Bower dependency directory (https://bower.io/)
+bower_components
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons (https://nodejs.org/api/addons.html)
+build/Release
+
+# Dependency directories
+node_modules/
+jspm_packages/
+*.local
+
+# Snowpack dependency directory (https://snowpack.dev/)
+web_modules/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variable files
+.env
+.env.*
+!.env.example
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+out
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+.output
+
+# Gatsby files
+.cache/
+# Comment in the public line in if your project uses Gatsby and not Next.js
+# https://nextjs.org/blog/next-9-1#public-directory-support
+# public
+
+# vuepress build output
+.vuepress/dist
+
+# vuepress v2.x temp directory
+.temp
+
+# Sveltekit cache directory
+.svelte-kit/
+
+# vitepress build output
+**/.vitepress/dist
+
+# vitepress cache directory
+**/.vitepress/cache
+
+# Docusaurus cache and generated files
+.docusaurus
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# Firebase cache directory
+.firebase/
+
+# TernJS port file
+.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# pnpm
+.pnpm-store
+
+# yarn v3
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# Vite files
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+.vite/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Archive
+data/raw/
+data/
+*.tiff
+*.tif
+*.png
+*.jpg
+*.jpeg
+*.pdf
+!frontend/src/assets/*.png
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+</file>
+
+</files>
