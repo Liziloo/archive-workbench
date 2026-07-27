@@ -1,14 +1,28 @@
+import os
+from sqlmodel import Session
 from app.db.session import engine
 from app.services.harvester import HarvesterService
-from app.core.config import settings
-from sqlmodel import Session
+from app.models.core import AssetRole
 
 def main():
-    print(f"🚀 Starting Harvester on {settings.STAGING_DIRECTORY}")
+    # Define our sources and their roles
+    sources = [
+        (os.getenv("PATH_RAW"), AssetRole.PRIMARY),
+        (os.getenv("PATH_EDITED"), AssetRole.PRIMARY), # Edits are also primary evidence
+        (os.getenv("PATH_CARL"), AssetRole.REFERENCE), # Carl's are just for reference
+    ]
+
     with Session(engine) as session:
         harvester = HarvesterService(session)
-        count = harvester.scan(settings.STAGING_DIRECTORY)
-    print(f"✅ Finished. Ingested/Verified {count} assets.")
+
+        for path, role in sources:
+            if not path:
+                print(f"❌ Path not found in .env for {role.value}")
+                continue
+
+            print(f"🚀 Ingesting {role.value} assets from: {path}")
+            count = harvester.scan(path, role=role)
+            print(f"✅ Finished {role.value}: {count} assets registered.")
 
 if __name__ == "__main__":
     main()

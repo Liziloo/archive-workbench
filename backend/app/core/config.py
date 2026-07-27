@@ -8,17 +8,16 @@ dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
 
 class Settings(BaseSettings):
-    # Pydantic will look for these in the environment
     DATABASE_URL: str
     STAGING_DIRECTORY: str
-    PROJECT_NAME: str = "Archive Workbench"
 
-    # This is the "magic" that connects the .env to the class
-    model_config = SettingsConfigDict(
-        env_file=dotenv_path,
-        env_file_encoding='utf-8',
-        extra="ignore"
-    )
+    # Add the three specific source paths
+    PATH_RAW: str
+    PATH_EDITED: str
+    PATH_CARL: str
+
+    PROJECT_NAME: str = "Archive Workbench"
+    model_config = SettingsConfigDict(env_file=dotenv_path, extra="ignore")
 
 # Instantiate settings
 try:
