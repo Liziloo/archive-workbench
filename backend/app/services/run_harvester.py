@@ -5,11 +5,11 @@ from app.services.harvester import HarvesterService
 from app.models.core import AssetRole
 
 def main():
-    # Define our sources and their roles
+    # Define our sources based on the verified .env keys
     sources = [
         (os.getenv("PATH_RAW"), AssetRole.PRIMARY),
-        (os.getenv("PATH_EDITED"), AssetRole.PRIMARY), # Edits are also primary evidence
-        (os.getenv("PATH_CARL"), AssetRole.REFERENCE), # Carl's are just for reference
+        (os.getenv("PATH_EDITED"), AssetRole.PRIMARY),
+        (os.getenv("PATH_CARL"), AssetRole.REFERENCE),
     ]
 
     with Session(engine) as session:
@@ -17,7 +17,7 @@ def main():
 
         for path, role in sources:
             if not path:
-                print(f"❌ Path not found in .env for {role.value}")
+                print(f"⚠️  Skipping: No path defined for {role.value}")
                 continue
 
             print(f"🚀 Ingesting {role.value} assets from: {path}")

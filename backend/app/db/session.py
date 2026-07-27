@@ -1,10 +1,12 @@
+import json
 from sqlmodel import create_engine, Session
-from app.core.config import settings # Assuming a config for DATABASE_URL
+from app.core.config import settings
 
+# Remove the lambda obj: obj line.
+# SQLAlchemy will now automatically handle the dict -> JSON conversion.
 engine = create_engine(
     settings.DATABASE_URL,
-    echo=True, # Useful for debugging SQL during development
-    json_serializer=lambda obj: obj # Let Postgres handle JSONB optimization
+    echo=False # Set to False to reduce terminal noise
 )
 
 def get_session():

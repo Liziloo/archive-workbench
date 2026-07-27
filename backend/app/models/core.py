@@ -2,8 +2,9 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional, Dict, Any
 from uuid import UUID, uuid4
-from sqlalchemy import Column, JSON
+from sqlalchemy import Column
 from sqlmodel import Field, Relationship, SQLModel
+from sqlalchemy.dialects.postgresql import JSONB
 
 # --- Enums ---
 
@@ -36,7 +37,7 @@ class DigitalAsset(SQLModel, table=True):
     verification: VerificationStatus = Field(default=VerificationStatus.PENDING)
 
     # Technical metadata (EXIF, resolution, etc.)
-    technical_metadata: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    technical_metadata: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSONB))
 
     # Relationships
     item_id: Optional[UUID] = Field(default=None, foreign_key="archivalitem.id")
@@ -72,13 +73,13 @@ class ArchivalItem(SQLModel, table=True):
 
     # Physical-to-Digital Hierarchy
     # Expected keys: series, box, folder, bin
-    physical_address: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    physical_address: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSONB))
 
     # Legacy IDs from Tropy or Carl's Catalog
-    external_identifiers: Dict[str, str] = Field(default_factory=dict, sa_column=Column(JSON))
+    external_identifiers: Dict[str, str] = Field(default_factory=dict, sa_column=Column(JSONB))
 
     # The final, curated Dublin Core metadata for Omeka S
-    canonical_metadata: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    canonical_metadata: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSONB))
 
     # Relationships
     digital_assets: List[DigitalAsset] = Relationship(back_populates="item")
