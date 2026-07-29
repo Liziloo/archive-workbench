@@ -1,6 +1,6 @@
 import hashlib
 import pathlib
-from typing import Optional
+from typing import Dict
 from sqlmodel import Session, select
 from app.models.core import DigitalAsset, ArchivalItem, AssetRole, VerificationStatus
 
@@ -9,34 +9,30 @@ class HarvesterService:
         self.session = session
 
     def calculate_sha256(self, file_path: pathlib.Path) -> str:
-        """Memory-efficient hashing for large archival TIFFs."""
         sha256_hash = hashlib.sha256()
         with open(file_path, "rb") as f:
             for byte_block in iter(lambda: f.read(8192), b""):
                 sha256_hash.update(byte_block)
         return sha256_hash.hexdigest()
 
-    def ingest_file(self, file_path: pathlib.Path, role: AssetRole):
-        """Processes a single file with a specific archival role."""
+    def ingest_file(self, file_path: pathlib.Path, role: AssetRole) -> str:
+        """Processes a file and returns a status string: 'new', 'skipped', or 'healed'."""
         file_hash = self.calculate_sha256(file_path)
 
-        # Level 1 Match: Check for existing hash
         statement = select(DigitalAsset).where(DigitalAsset.sha256 == file_hash)
         existing_asset = self.session.exec(statement).first()
 
         if existing_asset:
-            # HEALING/DUPLICATION LOGIC:
-            # If the exact same hash is found in a different folder:
+            # HEALING: If the hash is the same but the path changed
             if existing_asset.file_path != str(file_path):
-                # We don't create a new ArchivalItem.
-                # For now, we just log that we found a duplicate of an existing asset.
-                # In the future, we could add this as a 'Supporting' asset to the same item.
-                print(f"  - Duplicate hash found for {file_path.name} (Already registered)")
-            return existing_asset
+                existing_asset.file_path = str(file_path)
+                self.session.add(existing_asset)
+                self.session.commit()
+                return "healed"
+            # DUPLICATE: Same hash, same path
+            return "skipped"
 
         # NEW ASSET FLOW
-        # 1. Create the ArchivalItem (The 'Shell')
-        # We store the source zone in the physical_address JSONB
         new_item = ArchivalItem(
             physical_address={
                 "source_zone": role.value,
@@ -45,9 +41,8 @@ class HarvesterService:
             }
         )
         self.session.add(new_item)
-        self.session.flush() # Get the new_item.id
+        self.session.flush()
 
-        # 2. Create the DigitalAsset
         new_asset = DigitalAsset(
             sha256=file_hash,
             file_path=str(file_path),
@@ -59,10 +54,9 @@ class HarvesterService:
         )
         self.session.add(new_asset)
         self.session.commit()
-        self.session.refresh(new_asset)
-        return new_asset
+        return "new"
 
-    def scan(self, target_path: str, role: AssetRole):
+    def scan(self, target_path: str, role: AssetRole) -> Dict[str, int]:
         root = pathlib.Path(target_path)
         valid_exts = {'.jpg', '.jpeg', '.png', '.tif', '.tiff'}
 
@@ -71,7 +65,7 @@ class HarvesterService:
         for path in root.rglob("*"):
             if path.is_file() and path.suffix.lower() in valid_exts:
                 try:
-                    # We'll modify ingest_file to return a status string
+                    # Now ingest_file returns a string key for our stats dict
                     status = self.ingest_file(path, role=role)
                     stats[status] += 1
                 except Exception as e:
@@ -79,4 +73,4 @@ class HarvesterService:
                     self.session.rollback()
 
         print(f"  📊 Results: {stats['new']} New, {stats['skipped']} Skipped, {stats['healed']} Healed")
-        return stats["new"]
+        return stats
