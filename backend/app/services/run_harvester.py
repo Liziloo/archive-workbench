@@ -22,7 +22,7 @@ def main():
 
             print(f"🚀 Ingesting {role.value} assets from: {path}")
             count = harvester.scan(path, role=role)
-            print(f"✅ Finished {role.value}: {count} assets registered.")
+            print(f"✅ Finished {role.value}: {stats['new']} new assets registered.")
 
 if __name__ == "__main__":
     main()
