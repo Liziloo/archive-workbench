@@ -66,13 +66,17 @@ class HarvesterService:
         root = pathlib.Path(target_path)
         valid_exts = {'.jpg', '.jpeg', '.png', '.tif', '.tiff'}
 
-        count = 0
+        stats = {"new": 0, "skipped": 0, "healed": 0}
+
         for path in root.rglob("*"):
             if path.is_file() and path.suffix.lower() in valid_exts:
                 try:
-                    self.ingest_file(path, role=role)
-                    count += 1
+                    # We'll modify ingest_file to return a status string
+                    status = self.ingest_file(path, role=role)
+                    stats[status] += 1
                 except Exception as e:
                     print(f"  ❌ Error ingesting {path.name}: {e}")
-                    self.session.rollback() # <--- CRITICAL: Reset the transaction
-        return count
+                    self.session.rollback()
+
+        print(f"  📊 Results: {stats['new']} New, {stats['skipped']} Skipped, {stats['healed']} Healed")
+        return stats["new"]
