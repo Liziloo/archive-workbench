@@ -2,16 +2,16 @@
 
 ## Phase 1: Skeleton Application (Proving the Stack)
 *Goal: Establish communication between your GPU Workstation and Proxmox.*
-- [ ] **Backend:** Initialize FastAPI (Python) with a "Hello World" endpoint.
-- [ ] **Database:** Connect FastAPI to the PostgreSQL instance on Proxmox.
-- [ ] **Frontend:** Confirm Vite/React can fetch data from the Backend.
-- [ ] **Infrastructure:** Confirm Redis is reachable for background tasks.
+- [x] **Backend:** Initialize FastAPI (Python) with a "Hello World" endpoint.
+- [x] **Database:** Connect FastAPI to the PostgreSQL instance on Proxmox.
+- [x] **Frontend:** Confirm Vite/React can fetch data from the Backend.
+- [x] **Infrastructure:** Confirm Redis is reachable for background tasks.
 - **Result:** You have a dashboard that says "Connection Successful."
 
 ## Phase 2: Project & Environment Management
 *Goal: Make the tool reusable and configurable.*
 - [ ] **Project Schema:** Define settings for "The Fifty Acres" (Image Dir, Tropy Path, Omeka Credentials).
-- [ ] **Environment Check:** UI indicator for ROCm/GPU status (is the 7800 XT detected?).
+- [x] **Environment Check:** UI indicator for ROCm/GPU status (is the 7800 XT detected?).
 - **Result:** You can select the "Haushalter Casler Archive" project.
 
 ## Phase 3: The Harvester (Database & Ingestion)

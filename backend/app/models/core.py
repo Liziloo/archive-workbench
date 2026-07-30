@@ -27,6 +27,21 @@ class ItemStatus(str, Enum):
 
 # --- Models ---
 
+class Project(SQLModel, table=True):
+    """A distinct archival collection with its own settings and paths."""
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    name: str = Field(index=True)
+    description: Optional[str] = None
+
+    # This stores paths and settings specific to this archive
+    # e.g., {"path_raw": "/home/liz/...", "tropy_id_field": "identifier"}
+    config: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSONB))
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationships
+    items: List["ArchivalItem"] = Relationship(back_populates="project")
+
 class DigitalAsset(SQLModel, table=True):
     """The physical file on disk. Deterministic identity via SHA-256."""
     sha256: str = Field(primary_key=True, index=True)
@@ -46,8 +61,8 @@ class DigitalAsset(SQLModel, table=True):
 class EvidenceClaim(SQLModel, table=True):
     """Atomic data points extracted from sources (Tropy, XMP, AI)."""
     id: Optional[int] = Field(default=None, primary_key=True)
-    source_context: str  # e.g., "Tropy-Export-2024", "DigiKam-XMP", "Ollama-VLM"
-    property: str        # e.g., "date_created", "subject_person", "transcription"
+    source_context: str
+    property: str
     value: str
     is_verified: bool = Field(default=False)
 
@@ -58,8 +73,8 @@ class EvidenceClaim(SQLModel, table=True):
 class AuthorityLink(SQLModel, table=True):
     """Links to external research (WikiTree, Obsidian, etc.)."""
     id: Optional[int] = Field(default=None, primary_key=True)
-    system_name: str # "WikiTree", "Obsidian"
-    system_id: str   # The unique ID in that system
+    system_name: str
+    system_id: str
     uri: Optional[str] = None
 
     # Relationships
@@ -71,8 +86,11 @@ class ArchivalItem(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     status: ItemStatus = Field(default=ItemStatus.DRAFT)
 
+    # NEW: Link to the Project
+    project_id: Optional[UUID] = Field(default=None, foreign_key="project.id")
+    project: Optional[Project] = Relationship(back_populates="items")
+
     # Physical-to-Digital Hierarchy
-    # Expected keys: series, box, folder, bin
     physical_address: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSONB))
 
     # Legacy IDs from Tropy or Carl's Catalog
