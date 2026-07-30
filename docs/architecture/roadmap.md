@@ -10,14 +10,14 @@
 
 ## Phase 2: Project & Environment Management
 *Goal: Make the tool reusable and configurable.*
-- [ ] **Project Schema:** Define settings for "The Fifty Acres" (Image Dir, Tropy Path, Omeka Credentials).
+- [x] **Project Schema:** Define settings for "The Fifty Acres" (Image Dir, Tropy Path, Omeka Credentials).
 - [x] **Environment Check:** UI indicator for ROCm/GPU status (is the 7800 XT detected?).
 - **Result:** You can select the "Haushalter Casler Archive" project.
 
 ## Phase 3: The Harvester (Database & Ingestion)
 *Goal: Move from "Files" to "Digital Assets" using Deterministic Integrity.*
-- [ ] **The Real Data Model:** Deploy the `ArchivalItem`, `DigitalAsset`, and `EvidenceClaim` schema.
-- [ ] **The Hash Crawler:** Implement the service that scans your local directories and assigns SHA-256 IDs.
+- [x] **The Real Data Model:** Deploy the `ArchivalItem`, `DigitalAsset`, and `EvidenceClaim` schema.
+- [x] **The Hash Crawler:** Implement the service that scans your local directories and assigns SHA-256 IDs.
 - [ ] **Initial Importers:** Build the "Adapters" for Tropy (SQLite) and DigiKam (XMP).
 - **Result:** The database is populated with "Digital Assets" linked to their first "Evidence Claims."
 

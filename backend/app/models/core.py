@@ -25,6 +25,11 @@ class ItemStatus(str, Enum):
     VERIFIED = "verified"
     PUBLISHED = "published"
 
+class ProposedMatchStatus(str, Enum):
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    REJECTED = "rejected"
+
 # --- Models ---
 
 class Project(SQLModel, table=True):
@@ -53,6 +58,8 @@ class DigitalAsset(SQLModel, table=True):
 
     # Technical metadata (EXIF, resolution, etc.)
     technical_metadata: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSONB))
+
+    visual_embedding: Optional[List[float]] = Field(default=None, sa_column=Column(JSONB))
 
     # Relationships
     item_id: Optional[UUID] = Field(default=None, foreign_key="archivalitem.id")
@@ -106,3 +113,19 @@ class ArchivalItem(SQLModel, table=True):
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class ProposedMatch(SQLModel, table=True):
+    """Stores AI-suggested matches between two digital assets for human review."""
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+
+    # The two assets being compared
+    asset_a_sha256: str = Field(foreign_key="digitalasset.sha256")
+    asset_b_sha256: str = Field(foreign_key="digitalasset.sha256")
+
+    # How similar the AI thinks they are (0.0 to 1.0)
+    similarity_score: float
+
+    status: ProposedMatchStatus = Field(default=ProposedMatchStatus.PENDING)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    reviewed_at: Optional[datetime] = None
