@@ -15,9 +15,8 @@ dependencies = [
     "uvicorn[standard]>=0.51.0",
 ]
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["app*"]
+[tool.setuptools]
+packages = ["app", "app.api", "app.api.v1", "app.api.v1.endpoints", "app.core", "app.db", "app.models", "app.services"]
 
 [tool.setuptools.package-dir]
 app = "app"
