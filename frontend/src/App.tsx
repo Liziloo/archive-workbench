@@ -15,6 +15,22 @@ function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<ProjectStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<'dashboard' | 'matches'>('dashboard');
+  const [pendingMatches, setPendingMatches] = useState<any[]>([]);
+
+  // Fetch pending matches if in match view
+  useEffect(() => {
+    if (view === 'matches') {
+      fetch("http://localhost:8000/api/v1/matches/pending")
+        .then(res => res.json())
+        .then(data => setPendingMatches(data));
+    }
+  }, [view]);
+
+  const handleMatch = (id: string, action: 'confirm' | 'reject') => {
+    fetch(`http://localhost:8000/api/v1/matches/${id}/${action}`, { method: 'POST' })
+      .then(() => setPendingMatches(prev => prev.filter(m => m.id !== id)));
+  };
 
   useEffect(() => {
     fetch("http://localhost:8000/api/v1/projects/")
@@ -57,31 +73,42 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-12 font-sans">
-      <button
-        onClick={() => setSelectedProject(null)}
-        className="text-gray-500 hover:text-white mb-8 transition-colors"
-      >
-        ← Back to Projects
-      </button>
+    <div className="min-h-screen bg-black text-white p-8">
+      <nav className="flex gap-8 mb-12 border-b border-gray-800 pb-4">
+        <button onClick={() => setView('dashboard')} className={`text-sm font-bold uppercase tracking-widest ${view === 'dashboard' ? 'text-purple-500' : 'text-gray-500'}`}>Dashboard</button>
+        <button onClick={() => setView('matches')} className={`text-sm font-bold uppercase tracking-widest ${view === 'matches' ? 'text-purple-500' : 'text-gray-500'}`}>Match Review ({pendingMatches.length})</button>
+      </nav>
 
-      <header className="mb-12">
-        <h1 className="text-4xl font-bold">{selectedProject.name}</h1>
-        <p className="text-gray-400 mt-2">Project Dashboard</p>
-      </header>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-          <h2 className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-4">Total Items</h2>
-          <p className="text-5xl font-mono text-green-400">{selectedProject.item_count}</p>
+      {view === 'dashboard' ? (
+        <div>
+          <h1 className="text-4xl font-bold mb-2">{selectedProject.name}</h1>
+          <p className="text-green-400 font-mono">Items: {selectedProject.item_count}</p>
         </div>
-
-        {/* Placeholder for future stats */}
-        <div className="bg-gray-900 p-8 rounded-xl border border-gray-800 opacity-50">
-          <h2 className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-4">Unverified Evidence</h2>
-          <p className="text-5xl font-mono text-yellow-600">--</p>
+      ) : (
+        <div className="space-y-12">
+          {pendingMatches.map(m => (
+            <div key={m.id} className="bg-gray-900 rounded-xl overflow-hidden border border-gray-800">
+              <div className="bg-gray-800 p-4 flex justify-between items-center">
+                <span className="text-purple-400 font-bold">{m.score}% Visual Match</span>
+                <div className="flex gap-4">
+                  <button onClick={() => handleMatch(m.id, 'reject')} className="px-4 py-2 bg-red-900/20 text-red-400 rounded hover:bg-red-900/40 transition-all">Reject</button>
+                  <button onClick={() => handleMatch(m.id, 'confirm')} className="px-6 py-2 bg-purple-600 text-white rounded hover:bg-purple-500 transition-all">Confirm & Merge</button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-1 p-1 bg-black">
+                <div className="relative">
+                  <img src={`http://localhost:8000/api/v1/assets/${m.asset_a.sha256}/image`} className="w-full h-96 object-contain bg-gray-900" />
+                  <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 text-xs text-gray-300">Carl's Scan: {m.asset_a.filename}</div>
+                </div>
+                <div className="relative">
+                  <img src={`http://localhost:8000/api/v1/assets/${m.asset_b.sha256}/image`} className="w-full h-96 object-contain bg-gray-900" />
+                  <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 text-xs text-gray-300">Your Scan: {m.asset_b.filename}</div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
+      )}
     </div>
   );
 }
