@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Archive Workbench (AW) is intended to expedite the processing of archival materials by one untrained archivist in preparation for archival storage and publication through Omeka S.
+Archive Workbench (AW) is intended to expedite the processing of archival materials by one archivist in preparation for archival storage and publication through Omeka S.
 
 AW exists to make it possible for one person to process an overwhelming volume of museum-grade artifacts without reducing the quality or care given to those materials. Its purpose is to **streamline and reduce human effort wherever possible**, not to lower the standard of archival work.
 
