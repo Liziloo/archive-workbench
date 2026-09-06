@@ -219,3 +219,148 @@ def test_representation_reports_when_file_is_intact(tmp_path: Path):
     result = physical_object.add_representation(scan)
 
     assert result.representation.integrity_status == "intact"
+
+def test_archival_object_identifies_representation_needing_attention(
+    tmp_path: Path,
+):
+    scan = tmp_path / "letter-front.tif"
+    scan.write_bytes(b"original content")
+
+    physical_object = create_archival_object()
+    result = physical_object.add_representation(scan)
+
+    scan.write_bytes(b"changed content")
+
+    assert result.representation in physical_object.representations_needing_attention
+
+def test_archival_object_does_not_identify_intact_representation_as_needing_attention(
+    tmp_path: Path,
+):
+    scan = tmp_path / "letter-front.tif"
+    scan.write_bytes(b"original content")
+
+    physical_object = create_archival_object()
+    result = physical_object.add_representation(scan)
+
+    assert result.representation not in physical_object.representations_needing_attention
+
+def test_representation_can_be_explicitly_checked_for_integrity(
+    tmp_path: Path,
+):
+    scan = tmp_path / "letter-front.tif"
+    scan.write_bytes(b"original content")
+
+    physical_object = create_archival_object()
+    result = physical_object.add_representation(scan)
+
+    scan.write_bytes(b"changed content")
+
+    assert result.representation.check_integrity() == "modified"
+
+def test_representation_can_find_matching_file_in_search_location(
+    tmp_path: Path,
+):
+    original = tmp_path / "original" / "letter-front.tif"
+    recovered = tmp_path / "somewhere-else" / "renamed-letter-front.tif"
+
+    original.parent.mkdir()
+    recovered.parent.mkdir()
+
+    content = b"original content"
+    original.write_bytes(content)
+    recovered.write_bytes(content)
+
+    physical_object = create_archival_object()
+    result = physical_object.add_representation(original)
+
+    original.unlink()
+
+    matches = result.representation.find_matching_files(tmp_path)
+
+    assert recovered in matches
+
+def test_representation_finds_all_matching_files_in_search_location(
+    tmp_path: Path,
+):
+    original = tmp_path / "original" / "letter-front.tif"
+    first_copy = tmp_path / "copy-one" / "letter-front-copy.tif"
+    second_copy = tmp_path / "copy-two" / "letter-front-backup.tif"
+
+    original.parent.mkdir()
+    first_copy.parent.mkdir()
+    second_copy.parent.mkdir()
+
+    content = b"original content"
+    original.write_bytes(content)
+    first_copy.write_bytes(content)
+    second_copy.write_bytes(content)
+
+    physical_object = create_archival_object()
+    result = physical_object.add_representation(original)
+
+    original.unlink()
+
+    matches = result.representation.find_matching_files(tmp_path)
+
+    assert set(matches) == {first_copy, second_copy}
+
+def test_representation_can_verify_a_selected_matching_file(
+    tmp_path: Path,
+):
+    original = tmp_path / "original" / "letter-front.tif"
+    candidate = tmp_path / "somewhere-else" / "renamed-letter-front.tif"
+
+    original.parent.mkdir()
+    candidate.parent.mkdir()
+
+    content = b"original content"
+    original.write_bytes(content)
+    candidate.write_bytes(content)
+
+    physical_object = create_archival_object()
+    result = physical_object.add_representation(original)
+
+    original.unlink()
+
+    assert result.representation.verify_file(candidate) is True
+
+def test_representation_can_be_reassociated_with_verified_file(
+    tmp_path: Path,
+):
+    original = tmp_path / "original" / "letter-front.tif"
+    recovered = tmp_path / "somewhere-else" / "renamed-letter-front.tif"
+
+    original.parent.mkdir()
+    recovered.parent.mkdir()
+
+    content = b"original content"
+    original.write_bytes(content)
+    recovered.write_bytes(content)
+
+    physical_object = create_archival_object()
+    result = physical_object.add_representation(original)
+
+    original.unlink()
+
+    assert result.representation.reassociate_file(recovered) is True
+    assert result.representation.path == recovered
+
+def test_representation_refuses_to_be_reassociated_with_nonmatching_file(
+    tmp_path: Path,
+):
+    original = tmp_path / "original" / "letter-front.tif"
+    wrong_file = tmp_path / "somewhere-else" / "different-letter.tif"
+
+    original.parent.mkdir()
+    wrong_file.parent.mkdir()
+
+    original.write_bytes(b"original content")
+    wrong_file.write_bytes(b"different content")
+
+    physical_object = create_archival_object()
+    result = physical_object.add_representation(original)
+
+    original.unlink()
+
+    assert result.representation.reassociate_file(wrong_file) is False
+    assert result.representation.path == original

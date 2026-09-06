@@ -3,12 +3,20 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 
+def _file_hexdigest(path: Path) -> str:
+    return sha256(path.read_bytes()).hexdigest()
+
+
+def _file_digest(path: Path) -> bytes:
+    return sha256(path.read_bytes()).digest()
+
+
 class Representation:
     def __init__(self, path: Path, duplicate: bool, added: bool):
         self.path = path
         self.duplicate = duplicate
         self.added = added
-        self.identity = sha256(path.read_bytes()).hexdigest()
+        self.identity = _file_hexdigest(path)
         self.representation = self
         self.added_at = datetime.now(timezone.utc)
 
@@ -17,7 +25,7 @@ class Representation:
 
     def matches_current_file(self):
         try:
-            current_hash = sha256(self.path.read_bytes()).hexdigest()
+            current_hash = _file_hexdigest(self.path)
         except FileNotFoundError:
             return False
         return current_hash == self.identity
@@ -25,12 +33,40 @@ class Representation:
     @property
     def integrity_status(self):
         try:
-            current_hash = sha256(self.path.read_bytes()).hexdigest()
+            current_hash = _file_hexdigest(self.path)
         except FileNotFoundError:
             return "missing"
         if current_hash == self.identity:
             return "intact"
         return "modified"
+
+    def check_integrity(self):
+        return self.integrity_status
+
+    def find_matching_files(self, search_location: Path):
+        matching = []
+        for candidate in search_location.rglob("*"):
+            if candidate.is_file():
+                try:
+                    candidate_hash = _file_hexdigest(candidate)
+                except (OSError, FileNotFoundError):
+                    continue
+                if candidate_hash == self.identity:
+                    matching.append(candidate)
+        return matching
+
+    def verify_file(self, file_path: Path) -> bool:
+        try:
+            candidate_hash = _file_hexdigest(file_path)
+        except (OSError, FileNotFoundError):
+            return False
+        return candidate_hash == self.identity
+
+    def reassociate_file(self, file_path: Path) -> bool:
+        if self.verify_file(file_path):
+            self.path = file_path
+            return True
+        return False
 
 
 class ArchivalObject:
@@ -63,13 +99,21 @@ class ArchivalObject:
         return representation
 
     def check_for_duplicate(self, path: Path) -> bool:
-        candidate_hash = sha256(path.read_bytes()).digest()
+        candidate_hash = _file_digest(path)
 
         for representation in self.representations:
-            if sha256(representation.read_bytes()).digest() == candidate_hash:
+            if _file_digest(representation.path) == candidate_hash:
                 return True
 
         return False
+
+    @property
+    def representations_needing_attention(self):
+        return [
+            rep
+            for rep in self.representations
+            if rep.integrity_status in ("modified", "missing")
+        ]
 
 
 def create_archival_object():
