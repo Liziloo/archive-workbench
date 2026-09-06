@@ -1,5 +1,6 @@
 from pathlib import Path
 from hashlib import sha256
+from datetime import datetime, timezone
 
 from archive_workbench.archival_object import create_archival_object
 
@@ -141,3 +142,16 @@ def test_archival_object_exposes_its_digital_representations(
     assert first_result.representation in representations
     assert second_result.representation in representations
     assert len(representations) == 2
+
+def test_representation_records_when_it_was_added(tmp_path: Path):
+    scan = tmp_path / "letter-front.tif"
+    scan.write_bytes(b"front of the letter")
+
+    physical_object = create_archival_object()
+
+    before = datetime.now(timezone.utc)
+    result = physical_object.add_representation(scan)
+    after = datetime.now(timezone.utc)
+
+    assert result.added is True
+    assert before <= result.representation.added_at <= after
