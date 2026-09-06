@@ -1,5 +1,6 @@
 from hashlib import sha256
 from pathlib import Path
+from datetime import datetime, timezone
 
 
 class Representation:
@@ -9,6 +10,7 @@ class Representation:
         self.added = added
         self.identity = sha256(path.read_bytes()).hexdigest()
         self.representation = self
+        self.added_at = datetime.now(timezone.utc)
 
     def read_bytes(self):
         return self.path.read_bytes()
