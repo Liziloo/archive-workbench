@@ -15,6 +15,10 @@ class Representation:
     def read_bytes(self):
         return self.path.read_bytes()
 
+    def matches_current_file(self):
+        current_hash = sha256(self.path.read_bytes()).hexdigest()
+        return current_hash == self.identity
+
 
 class ArchivalObject:
     def __init__(self):

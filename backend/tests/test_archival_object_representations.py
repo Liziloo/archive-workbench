@@ -155,3 +155,25 @@ def test_representation_records_when_it_was_added(tmp_path: Path):
 
     assert result.added is True
     assert before <= result.representation.added_at <= after
+
+def test_representation_records_last_known_path(tmp_path: Path):
+    scan = tmp_path / "letter-front.tif"
+    scan.write_bytes(b"front of the letter")
+
+    physical_object = create_archival_object()
+
+    result = physical_object.add_representation(scan)
+
+    assert result.added is True
+    assert result.representation.path == scan
+
+def test_representation_detects_when_file_has_changed(tmp_path: Path):
+    scan = tmp_path / "letter-front.tif"
+    scan.write_bytes(b"original content")
+
+    physical_object = create_archival_object()
+    result = physical_object.add_representation(scan)
+
+    scan.write_bytes(b"changed content")
+
+    assert result.representation.matches_current_file() is False
