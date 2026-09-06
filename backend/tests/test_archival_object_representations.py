@@ -188,3 +188,34 @@ def test_representation_detects_when_file_is_missing(tmp_path: Path):
     scan.unlink()
 
     assert result.representation.matches_current_file() is False
+
+def test_representation_reports_when_file_has_been_modified(tmp_path: Path):
+    scan = tmp_path / "letter-front.tif"
+    scan.write_bytes(b"original content")
+
+    physical_object = create_archival_object()
+    result = physical_object.add_representation(scan)
+
+    scan.write_bytes(b"changed content")
+
+    assert result.representation.integrity_status == "modified"
+
+def test_representation_reports_when_file_is_missing(tmp_path: Path):
+    scan = tmp_path / "letter-front.tif"
+    scan.write_bytes(b"original content")
+
+    physical_object = create_archival_object()
+    result = physical_object.add_representation(scan)
+
+    scan.unlink()
+
+    assert result.representation.integrity_status == "missing"
+
+def test_representation_reports_when_file_is_intact(tmp_path: Path):
+    scan = tmp_path / "letter-front.tif"
+    scan.write_bytes(b"original content")
+
+    physical_object = create_archival_object()
+    result = physical_object.add_representation(scan)
+
+    assert result.representation.integrity_status == "intact"

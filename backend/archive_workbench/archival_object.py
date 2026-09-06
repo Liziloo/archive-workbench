@@ -22,6 +22,16 @@ class Representation:
             return False
         return current_hash == self.identity
 
+    @property
+    def integrity_status(self):
+        try:
+            current_hash = sha256(self.path.read_bytes()).hexdigest()
+        except FileNotFoundError:
+            return "missing"
+        if current_hash == self.identity:
+            return "intact"
+        return "modified"
+
 
 class ArchivalObject:
     def __init__(self):
