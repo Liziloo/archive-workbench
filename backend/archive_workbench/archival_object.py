@@ -2,10 +2,16 @@ from hashlib import sha256
 from pathlib import Path
 
 
-class AddRepresentationResult:
-    def __init__(self, duplicate: bool, added: bool):
+class Representation:
+    def __init__(self, path: Path, duplicate: bool, added: bool):
+        self.path = path
         self.duplicate = duplicate
         self.added = added
+        self.identity = sha256(path.read_bytes()).hexdigest()
+        self.representation = self
+
+    def read_bytes(self):
+        return self.path.read_bytes()
 
 
 class ArchivalObject:
@@ -15,12 +21,27 @@ class ArchivalObject:
     def add_representation(self, path: Path, confirm_duplicate: bool = False):
         if self.check_for_duplicate(path):
             if confirm_duplicate:
-                self.representations.append(path)
-                return AddRepresentationResult(duplicate=True, added=True)
+                representation = Representation(
+                    path=path,
+                    duplicate=True,
+                    added=True,
+                )
+                self.representations.append(representation)
+                return representation
             else:
-                return AddRepresentationResult(duplicate=True, added=False)
-        self.representations.append(path)
-        return path
+                return Representation(
+                    path=path,
+                    duplicate=True,
+                    added=False,
+                )
+
+        representation = Representation(
+            path=path,
+            duplicate=False,
+            added=True,
+        )
+        self.representations.append(representation)
+        return representation
 
     def check_for_duplicate(self, path: Path) -> bool:
         candidate_hash = sha256(path.read_bytes()).digest()
