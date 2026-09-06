@@ -16,7 +16,10 @@ class Representation:
         return self.path.read_bytes()
 
     def matches_current_file(self):
-        current_hash = sha256(self.path.read_bytes()).hexdigest()
+        try:
+            current_hash = sha256(self.path.read_bytes()).hexdigest()
+        except FileNotFoundError:
+            return False
         return current_hash == self.identity
 
 
