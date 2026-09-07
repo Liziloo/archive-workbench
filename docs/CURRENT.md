@@ -1,22 +1,99 @@
-# Current Work
+# Archive Workbench — Current
 
 ## Current Slice
 
-One physical archival object → multiple digital representations.
+**A minimal usable interface for working with an archival object and its digital representations.**
 
-## We Are Trying to Prove
+The previous slice established the underlying behavior for representing one physical archival object with multiple digital representations, including:
 
-That AW can correctly represent one archival object when its digital representations consist of multiple scans.
+- multiple representations per archival object
+- content identity and duplicate detection
+- explicit confirmation for adding duplicates
+- integrity status
+- detection of modified or missing representations
+- searching for matching files
+- human verification and reassociation
+- optional explicit ordering of representations
 
-## We Are Not Doing
+That slice is complete.
 
-* Complete schema redesign
-* AI integration
-* Omeka integration
-* Dashboard development
-* Migration of existing data
-* Preservation-system design
+The next slice moves upward from domain behavior to actual use: an archivist must be able to interact with this functionality through a minimal user interface rather than only through Python code and tests.
 
-## Next Action
+## Goal
 
-Write behavioral acceptance tests for this slice.
+Create the smallest end-to-end interface that allows an archivist to work with an archival object and its digital representations.
+
+The interface does not need to be attractive, polished, or feature-complete.
+
+It needs to make the established behavior usable.
+
+The purpose of this slice is to establish the boundary between the archivist and the AW domain model.
+
+## Behavioral Scope
+
+The interface should eventually allow the archivist to:
+
+- create or open an archival object
+- see the object's digital representations
+- add a digital representation
+- receive the existing duplicate warning/confirmation behavior
+- see representation integrity status
+- see which representations need attention
+- use the existing recovery behavior when a representation needs attention
+
+Only behavior that is explicitly established by tests belongs in this slice.
+
+## Principles
+
+- The interface is a means of exercising existing archival behavior, not a reason to redesign that behavior.
+- Prefer the smallest usable interface over premature visual or architectural polish.
+- Preserve the distinction between the physical archival object and its digital representations.
+- Do not invent archival interpretation or metadata requirements merely because a UI needs fields.
+- Do not silently perform consequential actions.
+- Existing human-confirmation requirements remain human-confirmation requirements in the UI.
+- If a computer can perform an established routine operation reliably and safely, the interface should not require unnecessary manual repetition.
+- Do not add functionality merely because it would eventually be useful.
+
+## Explicitly Out of Scope
+
+This slice does **not** include:
+
+- final UI/UX design
+- visual polish or branding
+- complete archival metadata
+- Dublin Core or Omeka S integration
+- publication workflows
+- authentication or multi-user support
+- preservation-system design
+- database/schema redesign unless required by an established behavior
+- AI integration
+- bulk processing
+- dashboards
+- advanced search
+- migration of existing data
+- generalized workflow/state-machine design
+
+## Development Approach
+
+Continue using thin, behavioral vertical slices.
+
+For each new behavior:
+
+1. Define the behavior.
+2. Write the behavioral acceptance test.
+3. Have Aider implement the behavior.
+4. Run the tests.
+5. Inspect and refactor where justified.
+6. Repeat.
+
+Tests define intended behavior before implementation.
+
+The user owns the tests. Aider must not modify tests.
+
+## Success Criteria
+
+This slice is complete when an archivist can use the minimal interface to exercise the core representation workflow established by the previous slice without needing to interact directly with Python code.
+
+The interface may be crude.
+
+It must be real.
