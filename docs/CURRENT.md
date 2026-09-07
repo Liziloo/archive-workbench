@@ -17,7 +17,7 @@ The previous slice established the underlying behavior for representing one phys
 
 That slice is complete.
 
-The next slice moves upward from domain behavior to actual use: an archivist must be able to interact with this functionality through a minimal user interface rather than only through Python code and tests.
+The current slice moves from domain behavior to actual use: an archivist must be able to interact with this functionality through a minimal user interface rather than only through Python code and tests.
 
 ## Goal
 
@@ -25,13 +25,13 @@ Create the smallest end-to-end interface that allows an archivist to work with a
 
 The interface does not need to be attractive, polished, or feature-complete.
 
-It needs to make the established behavior usable.
+It needs to make the established representation behavior usable.
 
-The purpose of this slice is to establish the boundary between the archivist and the AW domain model.
+This slice establishes the first usable interface to the existing domain behavior.
 
 ## Behavioral Scope
 
-The interface should eventually allow the archivist to:
+The intended behavioral scope of this slice is:
 
 - create or open an archival object
 - see the object's digital representations
@@ -41,7 +41,7 @@ The interface should eventually allow the archivist to:
 - see which representations need attention
 - use the existing recovery behavior when a representation needs attention
 
-Only behavior that is explicitly established by tests belongs in this slice.
+The interface should expose existing behavior rather than introduce new archival behavior.
 
 ## Principles
 
