@@ -1,82 +1,100 @@
-# Archive Workbench — Current
+# Current Development State
 
-## Current Slice
+Archive Workbench is transitioning from tested backend domain behavior to its first usable graphical interface.
 
-**A minimal usable interface for working with an archival object and its digital representations.**
+## Current Slice: Frontend Scaffolding
 
-The previous slice established the underlying behavior for representing one physical archival object with multiple digital representations, including:
+The backend currently contains the tested domain behavior for working with archival objects and their digital representations. The next step is to establish the GUI infrastructure needed to exercise that behavior through an actual user interface.
 
-- multiple representations per archival object
-- content identity and duplicate detection
-- explicit confirmation for adding duplicates
-- integrity status
-- detection of modified or missing representations
-- searching for matching files
-- human verification and reassociation
-- optional explicit ordering of representations
+The GUI will be a **React + TypeScript application using Vite**, communicating with the existing FastAPI backend.
 
-That slice is complete.
+This is an infrastructure/scaffolding step, not yet a user-facing behavioral slice.
 
-The current slice moves from domain behavior to actual use: an archivist must be able to interact with this functionality through a minimal user interface rather than only through Python code and tests.
+### Immediate goals
 
-## Goal
+* Create the `frontend/` React + TypeScript + Vite application.
+* Establish frontend development and test infrastructure.
+* Establish the boundary between the React frontend and FastAPI backend.
+* Make the frontend runnable alongside the backend.
+* Establish the smallest appropriate application smoke test.
+* Avoid introducing additional frameworks or architectural machinery until a real requirement calls for them.
 
-Create the smallest end-to-end interface that allows an archivist to work with an archival object and its digital representations.
+### After scaffolding
 
-The interface does not need to be attractive, polished, or feature-complete.
+Once the frontend infrastructure exists, development returns to the normal test-first workflow.
 
-It needs to make the established representation behavior usable.
+The first GUI behavioral slice should establish that an archivist can perform a meaningful operation through the GUI—for example, creating or opening an archival object—rather than merely testing that a GUI application exists.
 
-This slice establishes the first usable interface to the existing domain behavior.
+## Architecture
 
-## Behavioral Scope
+```text
+Archive Workbench
+├── frontend/
+│   └── React + TypeScript + Vite
+│       └── graphical user interface
+│
+└── backend/
+    └── FastAPI / Python
+        ├── API
+        ├── services
+        └── domain behavior
+```
 
-The intended behavioral scope of this slice is:
+The GUI should consume backend behavior through the API boundary rather than duplicating domain logic in the frontend.
 
-- create or open an archival object
-- see the object's digital representations
-- add a digital representation
-- receive the existing duplicate warning/confirmation behavior
-- see representation integrity status
-- see which representations need attention
-- use the existing recovery behavior when a representation needs attention
+## Completed Backend Capability
 
-The interface should expose existing behavior rather than introduce new archival behavior.
+The backend currently supports:
 
-## Principles
+* archival objects
+* multiple digital representations of an archival object
+* content identity and duplicate detection
+* explicit confirmation of duplicate representations
+* representation integrity checking
+* detection of modified or missing representations
+* searching for and recovering missing representations
+* explicit reassociation of representations
+* optional explicit representation ordering
 
-- The interface is a means of exercising existing archival behavior, not a reason to redesign that behavior.
-- Prefer the smallest usable interface over premature visual or architectural polish.
-- Preserve the distinction between the physical archival object and its digital representations.
-- Do not invent archival interpretation or metadata requirements merely because a UI needs fields.
-- Do not silently perform consequential actions.
-- Existing human-confirmation requirements remain human-confirmation requirements in the UI.
-- If a computer can perform an established routine operation reliably and safely, the interface should not require unnecessary manual repetition.
-- Do not add functionality merely because it would eventually be useful.
+The backend representation tests currently pass.
 
-## Explicitly Out of Scope
+### Known unresolved behavior
 
-This slice does **not** include:
+The semantics of `ordered_representations` when an object contains a mixture of ordered and unordered representations have not yet been defined. No behavior should be invented for this case without an explicit requirement and test.
 
-- final UI/UX design
-- visual polish or branding
-- complete archival metadata
-- Dublin Core or Omeka S integration
-- publication workflows
-- authentication or multi-user support
-- preservation-system design
-- database/schema redesign unless required by an established behavior
-- AI integration
-- bulk processing
-- dashboards
-- advanced search
-- migration of existing data
-- generalized workflow/state-machine design
+## Development Workflow
 
-## Success Criteria
+Continue using the established test-first workflow:
 
-This slice is complete when an archivist can use the minimal interface to exercise the core representation workflow established by the previous slice without needing to interact directly with Python code.
+1. Define the intended behavior.
+2. Write the test.
+3. Have Aider implement the behavior.
+4. Run the tests.
+5. Inspect and refactor.
+6. Repeat.
 
-The interface may be crude.
+For the frontend transition, the GUI framework and test infrastructure may be established before the first user-facing GUI acceptance test. This scaffolding does not itself constitute a product behavior.
 
-It must be real.
+## Out of Scope for the Current Work
+
+* polished visual design
+* full metadata editing
+* Dublin Core / Omeka S integration
+* publication workflows
+* authentication
+* preservation infrastructure
+* database redesign unless required by an actual capability
+* AI features
+* bulk processing
+* dashboards
+* generalized workflow/state-machine architecture
+* advanced search
+* migration work
+* premature frontend state-management or component frameworks
+* desktop wrappers such as Tauri or Electron unless a demonstrated requirement warrants one
+
+## Success Condition
+
+The scaffolding work is complete when the React/TypeScript frontend can be developed and tested as part of Archive Workbench and can communicate with the existing FastAPI application.
+
+The next success condition is a tested, usable GUI behavior—not merely proof that the frontend exists.
