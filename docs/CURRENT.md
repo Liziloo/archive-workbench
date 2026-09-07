@@ -73,23 +73,6 @@ This slice does **not** include:
 - migration of existing data
 - generalized workflow/state-machine design
 
-## Development Approach
-
-Continue using thin, behavioral vertical slices.
-
-For each new behavior:
-
-1. Define the behavior.
-2. Write the behavioral acceptance test.
-3. Have Aider implement the behavior.
-4. Run the tests.
-5. Inspect and refactor where justified.
-6. Repeat.
-
-Tests define intended behavior before implementation.
-
-The user owns the tests. Aider must not modify tests.
-
 ## Success Criteria
 
 This slice is complete when an archivist can use the minimal interface to exercise the core representation workflow established by the previous slice without needing to interact directly with Python code.
