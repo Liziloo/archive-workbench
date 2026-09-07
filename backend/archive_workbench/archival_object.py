@@ -19,6 +19,7 @@ class Representation:
         self.identity = _file_hexdigest(path)
         self.representation = self
         self.added_at = datetime.now(timezone.utc)
+        self.order = None
 
     def read_bytes(self):
         return self.path.read_bytes()
@@ -68,6 +69,9 @@ class Representation:
             return True
         return False
 
+    def set_order(self, n: int) -> None:
+        self.order = n
+
 
 class ArchivalObject:
     def __init__(self):
@@ -114,6 +118,13 @@ class ArchivalObject:
             for rep in self.representations
             if rep.integrity_status in ("modified", "missing")
         ]
+
+    @property
+    def ordered_representations(self):
+        return sorted(
+            [rep for rep in self.representations if rep.order is not None],
+            key=lambda rep: rep.order,
+        )
 
 
 def create_archival_object():

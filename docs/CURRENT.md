@@ -6,7 +6,7 @@ One physical archival object → multiple digital representations.
 
 ## We Are Trying to Prove
 
-That AW can correctly represent one archival object when its digital representations consist of multiple ordered scans.
+That AW can correctly represent one archival object when its digital representations consist of multiple scans.
 
 ## We Are Not Doing
 

@@ -364,3 +364,44 @@ def test_representation_refuses_to_be_reassociated_with_nonmatching_file(
 
     assert result.representation.reassociate_file(wrong_file) is False
     assert result.representation.path == original
+
+def test_representations_can_have_an_explicit_order(tmp_path):
+    first = tmp_path / "page-one.txt"
+    second = tmp_path / "page-two.txt"
+    third = tmp_path / "page-three.txt"
+
+    first.write_text("page one")
+    second.write_text("page two")
+    third.write_text("page three")
+
+    physical_object = create_archival_object()
+
+    first_result = physical_object.add_representation(first)
+    second_result = physical_object.add_representation(second)
+    third_result = physical_object.add_representation(third)
+
+    first_result.representation.set_order(1)
+    second_result.representation.set_order(2)
+    third_result.representation.set_order(3)
+
+    assert physical_object.ordered_representations == [
+        first_result.representation,
+        second_result.representation,
+        third_result.representation,
+    ]
+
+
+def test_representations_do_not_require_an_order(tmp_path):
+    first = tmp_path / "photo-one.jpg"
+    second = tmp_path / "photo-two.jpg"
+
+    first.write_bytes(b"photo one")
+    second.write_bytes(b"photo two")
+
+    physical_object = create_archival_object()
+
+    first_result = physical_object.add_representation(first)
+    second_result = physical_object.add_representation(second)
+
+    assert first_result.representation.order is None
+    assert second_result.representation.order is None
