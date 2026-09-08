@@ -1,32 +1,35 @@
 # Current Development State
 
-Archive Workbench is transitioning from the completed backend representation work to its first usable graphical interface.
+Archive Workbench has completed its first substantive GUI behavioral slice and is beginning the next archivist-facing behavior.
 
-## Current Slice: First GUI Behavioral Slice
+## Completed Slice: Open an Archival Object
 
-The React + TypeScript + Vite frontend and its testing infrastructure are established.
+The GUI can:
 
-The frontend currently includes:
+* request an archival object from the FastAPI backend
+* display the archival object's identity
+* display all digital representations
+* display the path/name of each representation
+* display the integrity status of each representation
+* display a loading state while the object is retrieved
+* display an error state when retrieval fails
 
-* React + TypeScript + Vite
-* Vitest
-* React Testing Library
-* jsdom
-* ESLint
-* TypeScript checking
-* Vite development and production builds
-* a minimal application smoke test
+The behavior is tested at both the API and GUI boundaries.
 
-The next slice is the first substantive GUI behavior, together with the API boundary required to support it.
+The current implementation uses an in-memory backend fixture. Persistence and broader object-management behavior have not yet been introduced.
 
-### Immediate Goals
+## Developer Environment
 
-* Define the first meaningful archivist-facing GUI operation.
-* Establish the smallest API surface required for that operation.
-* Implement the operation through the GUI using the existing FastAPI backend.
-* Keep archival domain behavior in the backend.
+The frontend and backend can be developed together with a single command.
 
-A likely starting point is creating or opening an archival object and displaying it in the GUI, but the exact behavior remains to be defined.
+The development environment provides:
+
+* Vite development server with frontend HMR
+* FastAPI/Uvicorn development server with Python reload
+* Vite proxying of `/api` requests to FastAPI
+* a root `npm run dev` command that starts both servers
+
+The development environment is functioning end-to-end.
 
 ## Architecture
 
@@ -66,11 +69,35 @@ The backend representation tests pass.
 
 The semantics of `ordered_representations` when an object contains a mixture of ordered and unordered representations have not been defined.
 
-## Completed Frontend Infrastructure
+## Frontend Infrastructure
 
-The frontend can currently be developed and tested independently of product behavior.
+The frontend includes:
 
-The existing smoke test verifies that the application renders; it is infrastructure validation rather than a substantive product requirement.
+* React + TypeScript + Vite
+* Vitest
+* React Testing Library
+* jsdom
+* ESLint
+* TypeScript checking
+* Vite development and production builds
+* frontend acceptance tests
+
+The frontend acceptance tests pass.
+
+## Current Test State
+
+* Backend: 26 tests passing
+* Frontend: 5 tests passing
+* Frontend build: passing
+* Frontend lint: passing
+
+## Next Slice: Add a Digital Representation
+
+The next behavior is to allow an archivist to add a digital representation to an existing archival object.
+
+The slice should exercise the existing backend/domain representation behavior through the API and GUI rather than duplicating that behavior in the frontend.
+
+The exact acceptance criteria for this slice are to be defined before implementation.
 
 ## Out of Scope for the Current Work
 
@@ -90,8 +117,15 @@ The existing smoke test verifies that the application renders; it is infrastruct
 * premature frontend state-management or component frameworks
 * desktop wrappers such as Tauri or Electron unless a demonstrated requirement warrants one
 
-## Current Success Condition
+## Development Approach
 
-The frontend infrastructure is complete.
+New product behavior is developed test-first:
 
-The next milestone is a tested, usable GUI behavior that exercises real Archive Workbench functionality through the FastAPI backend.
+1. define the behavioral acceptance criteria
+2. write the acceptance tests
+3. implement the smallest behavior required to satisfy them
+4. verify the complete behavior end-to-end
+
+Developer ergonomics and other non-product scaffolding may be implemented directly when they do not change product behavior.
+
+No additional architecture or framework should be introduced unless required by an actual capability.
