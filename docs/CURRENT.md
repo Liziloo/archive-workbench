@@ -1,29 +1,32 @@
 # Current Development State
 
-Archive Workbench is transitioning from tested backend domain behavior to its first usable graphical interface.
+Archive Workbench is transitioning from the completed backend representation work to its first usable graphical interface.
 
-## Current Slice: Frontend Scaffolding
+## Current Slice: First GUI Behavioral Slice
 
-The backend currently contains the tested domain behavior for working with archival objects and their digital representations. The next step is to establish the GUI infrastructure needed to exercise that behavior through an actual user interface.
+The React + TypeScript + Vite frontend and its testing infrastructure are established.
 
-The GUI will be a **React + TypeScript application using Vite**, communicating with the existing FastAPI backend.
+The frontend currently includes:
 
-This is an infrastructure/scaffolding step, not yet a user-facing behavioral slice.
+* React + TypeScript + Vite
+* Vitest
+* React Testing Library
+* jsdom
+* ESLint
+* TypeScript checking
+* Vite development and production builds
+* a minimal application smoke test
 
-### Immediate goals
+The next slice is the first substantive GUI behavior, together with the API boundary required to support it.
 
-* Create the `frontend/` React + TypeScript + Vite application.
-* Establish frontend development and test infrastructure.
-* Establish the boundary between the React frontend and FastAPI backend.
-* Make the frontend runnable alongside the backend.
-* Establish the smallest appropriate application smoke test.
-* Avoid introducing additional frameworks or architectural machinery until a real requirement calls for them.
+### Immediate Goals
 
-### After scaffolding
+* Define the first meaningful archivist-facing GUI operation.
+* Establish the smallest API surface required for that operation.
+* Implement the operation through the GUI using the existing FastAPI backend.
+* Keep archival domain behavior in the backend.
 
-Once the frontend infrastructure exists, development returns to the normal test-first workflow.
-
-The first GUI behavioral slice should establish that an archivist can perform a meaningful operation through the GUI—for example, creating or opening an archival object—rather than merely testing that a GUI application exists.
+A likely starting point is creating or opening an archival object and displaying it in the GUI, but the exact behavior remains to be defined.
 
 ## Architecture
 
@@ -31,7 +34,8 @@ The first GUI behavioral slice should establish that an archivist can perform a 
 Archive Workbench
 ├── frontend/
 │   └── React + TypeScript + Vite
-│       └── graphical user interface
+│       ├── graphical user interface
+│       └── frontend tests
 │
 └── backend/
     └── FastAPI / Python
@@ -40,7 +44,7 @@ Archive Workbench
         └── domain behavior
 ```
 
-The GUI should consume backend behavior through the API boundary rather than duplicating domain logic in the frontend.
+The frontend consumes backend behavior through the API rather than duplicating domain logic.
 
 ## Completed Backend Capability
 
@@ -56,24 +60,17 @@ The backend currently supports:
 * explicit reassociation of representations
 * optional explicit representation ordering
 
-The backend representation tests currently pass.
+The backend representation tests pass.
 
-### Known unresolved behavior
+### Known Unresolved Behavior
 
-The semantics of `ordered_representations` when an object contains a mixture of ordered and unordered representations have not yet been defined. No behavior should be invented for this case without an explicit requirement and test.
+The semantics of `ordered_representations` when an object contains a mixture of ordered and unordered representations have not been defined.
 
-## Development Workflow
+## Completed Frontend Infrastructure
 
-Continue using the established test-first workflow:
+The frontend can currently be developed and tested independently of product behavior.
 
-1. Define the intended behavior.
-2. Write the test.
-3. Have Aider implement the behavior.
-4. Run the tests.
-5. Inspect and refactor.
-6. Repeat.
-
-For the frontend transition, the GUI framework and test infrastructure may be established before the first user-facing GUI acceptance test. This scaffolding does not itself constitute a product behavior.
+The existing smoke test verifies that the application renders; it is infrastructure validation rather than a substantive product requirement.
 
 ## Out of Scope for the Current Work
 
@@ -93,8 +90,8 @@ For the frontend transition, the GUI framework and test infrastructure may be es
 * premature frontend state-management or component frameworks
 * desktop wrappers such as Tauri or Electron unless a demonstrated requirement warrants one
 
-## Success Condition
+## Current Success Condition
 
-The scaffolding work is complete when the React/TypeScript frontend can be developed and tested as part of Archive Workbench and can communicate with the existing FastAPI application.
+The frontend infrastructure is complete.
 
-The next success condition is a tested, usable GUI behavior—not merely proof that the frontend exists.
+The next milestone is a tested, usable GUI behavior that exercises real Archive Workbench functionality through the FastAPI backend.
