@@ -16,7 +16,7 @@ Before making significant changes, inspect the repository and understand its exi
 
 - `DECISIONS.md` — established architectural and behavioral decisions.
 
-- `CURRENT.md` — current state, active work, tests, and unresolved questions.
+- `ROADMAP.md` — intended development sequence and upcoming work.
 
 
 Treat the actual implementation and tests as authoritative about what currently exists. Treat project documentation as authoritative about documented decisions and intent.
@@ -43,7 +43,7 @@ Antigravity is allowed to help build Archive Workbench. Archive Workbench is not
 
 GitHub is the canonical source for the project's committed code and history.
 
-The current Build-mode workspace is authoritative for work already in progress, including legitimate uncommitted changes. Do not discard, reset, or overwrite existing work merely to make the workspace match GitHub.
+The current Antigravity workspace is authoritative for work already in progress, including legitimate uncommitted changes. Do not discard, reset, or overwrite existing work merely to make the workspace match GitHub.
 
 When beginning work, inspect the actual repository and workspace state before deciding what needs to change.
 
