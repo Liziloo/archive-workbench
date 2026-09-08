@@ -1,0 +1,21 @@
+/* Minimal global reset – no Vite starter/demo styles */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color-scheme: light dark;
+  background: #fff;
+  color: #111;
+}
+
+#root {
+  min-height: 100dvh;
+}
