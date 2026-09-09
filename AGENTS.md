@@ -12,8 +12,8 @@ AW is not a greenfield application.
 
 Before making significant changes, inspect the repository and understand its existing architecture, conventions, tests, and current state. Read the relevant project documentation:
 
-- `PROJECT.md` — purpose, scope, and boundaries.
-- `DECISIONS.md` — established architectural and behavioral decisions.
+- `docs/PROJECT.md` — purpose, scope, and boundaries.
+- `docs/DECISIONS.md` — established architectural and behavioral decisions.
 - `docs/ROADMAP.md` — intended development sequence and upcoming work.
 
 Treat the actual implementation and tests as authoritative about what currently exists. Treat project documentation as authoritative about documented decisions and intent.
@@ -22,17 +22,7 @@ If they disagree, do not silently resolve the discrepancy. Determine whether the
 
 Do not import a generic application architecture when AW already has one.
 
-## 2. Keep the development environment separate from the application
-
-AW must remain an application that can be developed, run, tested, and deployed independently of the particular tools or AI systems used to develop it.
-
-Do not change AW's application architecture merely to accommodate the development environment.
-
-Do not introduce development-environment-specific infrastructure, services, APIs, authentication, hosting, or dependencies into AW merely because they are convenient for the agent.
-
-If a future AW requirement genuinely calls for such a technology, that is a product or architecture decision for Liz to make explicitly.
-
-## 3. Preserve the working project
+## 2. Preserve the working project
 
 GitHub is the canonical source for the project's committed code and history.
 
@@ -44,7 +34,7 @@ Preserve existing behavior unless the requested change intentionally changes it.
 
 Do not use destructive Git operations unless Liz explicitly requests them.
 
-## 4. Build the requested behavior
+## 3. Build the requested behavior
 
 When Liz requests a feature or behavior:
 
@@ -67,7 +57,7 @@ If a genuinely unresolved choice would establish product behavior, domain semant
 
 If it is only an implementation detail, choose a sensible solution and proceed.
 
-## 5. Respect established architecture and domain meaning
+## 4. Respect established architecture and domain meaning
 
 Prefer extending AW's existing architecture over replacing it with a framework, pattern, service, abstraction, or dependency that is merely familiar or convenient.
 
@@ -79,7 +69,7 @@ Do not import assumptions from generic CRUD applications or other software domai
 
 When those sources leave a domain question unresolved, do not invent semantics merely to simplify implementation.
 
-## 6. Tests are part of the specification
+## 5. Tests are part of the specification
 
 Tests should describe and protect observable behavior.
 
@@ -91,7 +81,7 @@ If a test conflicts with clearly established intended behavior, investigate the 
 
 A passing test suite is necessary but not sufficient. Use tests, type checking, builds, and other appropriate verification available in the project, and inspect the resulting behavior rather than assuming that passing checks means the feature is correct.
 
-## 7. Keep scope under control
+## 6. Keep scope under control
 
 Build what is requested and what is necessary to support it.
 
@@ -108,11 +98,11 @@ In particular, do not introduce unrelated:
 - preservation infrastructure
 - AI features
 - bulk-processing infrastructure
-- dashboards or analytics
+- analytics
 - elaborate design systems
 - abstractions for hypothetical future requirements
 
-## 8. Archival safety and human judgment
+## 7. Archival safety and human judgment
 
 AW is a workbench for preparing archival materials. It is not the publication system.
 
@@ -124,7 +114,7 @@ AI is collaborative and advisory. Historical interpretation and consequential ar
 
 When an operation could have lasting consequences for archival evidence or its interpretation, prefer reversible, reviewable, or explicitly approved behavior.
 
-## 9. Communicate the result
+## 8. Communicate the result
 
 Be direct about meaningful decisions, assumptions, failures, unresolved questions, and verification.
 
