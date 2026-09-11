@@ -22,6 +22,8 @@ If they disagree, do not silently resolve the discrepancy. Determine whether the
 
 Do not import a generic application architecture when AW already has one.
 
+Context economy with large files: When inspecting large data files or exports (such as tropy_export.json), do not dump the entire file into context. Use targeted inspection tools (such as head, jq, or small extracted fixture snippets) to understand the data schema.
+
 ## 2. Preserve the working project
 
 GitHub is the canonical source for the project's committed code and history.
@@ -57,6 +59,8 @@ If a genuinely unresolved choice would establish product behavior, domain semant
 
 If it is only an implementation detail, choose a sensible solution and proceed.
 
+Use project-local tooling: Always run commands using the project's established local environment (e.g., uv run pytest, .venv/bin/pytest, or npm test). Do not attempt to install packages globally or modify system-level Python.
+
 ## 4. Respect established architecture and domain meaning
 
 Prefer extending AW's existing architecture over replacing it with a framework, pattern, service, abstraction, or dependency that is merely familiar or convenient.
@@ -80,6 +84,8 @@ Do not weaken, delete, bypass, or rewrite a test merely because the implementati
 If a test conflicts with clearly established intended behavior, investigate the discrepancy and correct the test only when the intended behavior is actually known.
 
 A passing test suite is necessary but not sufficient. Use tests, type checking, builds, and other appropriate verification available in the project, and inspect the resulting behavior rather than assuming that passing checks means the feature is correct.
+
+Do not run blocking or persistent processes: Never execute long-running background commands (such as uvicorn, fastapi run, npm run dev, or interactive shells) in verification steps. Use automated test suites, build commands (npm run build), or one-off verification scripts that terminate cleanly.
 
 ## 6. Keep scope under control
 
@@ -113,6 +119,8 @@ Archival evidence must not be silently destroyed, overwritten, or transformed in
 AI is collaborative and advisory. Historical interpretation and consequential archival actions require human judgment and approval.
 
 When an operation could have lasting consequences for archival evidence or its interpretation, prefer reversible, reviewable, or explicitly approved behavior.
+
+Protect raw input fixtures: Treat raw archival exports (such as tropy_export.json) as immutable and read-only. Never modify, overwrite, or truncate source export files during testing. Test suites must use dedicated, small test fixtures in a tests/fixtures/ directory or in-memory mock data.
 
 ## 8. Communicate the result
 

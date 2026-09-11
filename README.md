@@ -35,7 +35,7 @@ It does not replace:
 
 ## Status
 
-AW is under active development. See `docs/CURRENT.md` for the current development slice and `docs/DECISIONS.md` for durable project decisions.
+AW is under active development. See `docs/DECISIONS.md` for durable project decisions.
 
 ## License
 

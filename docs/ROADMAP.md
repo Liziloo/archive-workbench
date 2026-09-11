@@ -21,7 +21,47 @@ The project should have:
 
 ---
 
-## 1. Add a Digital Representation
+## 1. Local Companion Foundation
+
+**Status: Next**
+
+Establish the minimal local companion service required for AW to access existing host-side files from the browser-based workbench.
+
+The companion should:
+
+* run locally alongside AW;
+
+* provide a narrowly scoped native file-selection capability;
+
+* allow the archivist to select an existing host-side file;
+
+* return the selected file's actual host filesystem path;
+
+* provide the file information AW needs to register the file, including its SHA-256 identity;
+
+* handle cancellation and relevant filesystem failures.
+
+The companion is a capability bridge. It does not own archival records, define archival semantics, or become responsible for storing or preserving the files it accesses.
+
+This slice does **not** include:
+
+* archival object management;
+
+* representation management;
+
+* copying files into AW-managed storage;
+
+* persistent storage;
+
+* generalized filesystem access;
+
+* generalized import infrastructure.
+
+**Success criterion:** AW can invoke the companion and receive a usable host-side file reference and the information needed to examine that file for registration.
+
+---
+
+## 2. Add a Digital Representation
 
 **Status: Next**
 
@@ -31,20 +71,20 @@ The intended interaction is:
 
 1. Open an archival object.
 2. Choose **Add Digital Representation**.
-3. Use a browser file picker to select an existing file.
-4. AW examines the actual file.
+3. Use the local companion service's native file picker to select an existing host-side file.
+4. The companion provides AW with the selected file's actual host filesystem path and the file information AW needs.
 5. AW creates and associates a representation.
 6. The new representation immediately appears in the object view.
 
 This slice should establish end-to-end behavior for:
 
 * selecting an existing file through the GUI;
-* getting the selected file to the backend;
+* getting the selected file's actual host filesystem path and required file information to the backend;
 * creating a domain `Representation`;
 * computing its SHA-256 identity;
 * detecting duplicate content;
 * requiring explicit confirmation when adding a duplicate;
-* handling selection, transfer, validation, and other relevant failures;
+* handling selection, filesystem access, validation, and other relevant failures;
 * showing the resulting representation immediately.
 
 The slice does **not** include:
@@ -56,11 +96,11 @@ The slice does **not** include:
 * representation ordering UI;
 * generalized import infrastructure.
 
-AW should associate an existing digital file; it should not silently assume responsibility for storing or preserving that file.
+AW should associate an existing host-side digital file rather than import it into AW-managed storage. The local companion provides the filesystem access needed to select and examine the file; it does not become responsible for storing or preserving it.
 
 ---
 
-## 2. Create and Manage Archival Objects
+## 3. Create and Manage Archival Objects
 
 Move beyond the hard-coded example object.
 
@@ -77,7 +117,7 @@ Persistence is not required yet; an in-memory implementation is sufficient while
 
 ---
 
-## 3. Multiple Archives
+## 4. Multiple Archives
 
 Establish the architectural boundary between distinct archives before object-management functionality grows too far.
 
@@ -94,7 +134,7 @@ The precise model for defining, organizing, and selecting archives is intentiona
 
 ---
 
-## 4. Physical Archival Object Information
+## 5. Physical Archival Object Information
 
 Add the ability to describe and edit basic information about the physical archival object.
 
@@ -104,7 +144,7 @@ This slice should establish the domain meaning and workflow for information that
 
 ---
 
-## 5. Representation Management
+## 6. Representation Management
 
 Provide useful management and inspection of an object's digital representations.
 
@@ -122,7 +162,7 @@ The semantics of mixed ordered and unordered representations remain intentionall
 
 ---
 
-## 6. File Recovery and Reassociation
+## 7. File Recovery and Reassociation
 
 Allow an archivist to recover a representation whose associated file is missing or displaced.
 
@@ -138,7 +178,7 @@ Reassociation must preserve the representation's identity. AW must not silently 
 
 ---
 
-## 7. Archival Processing and Workbench Tasks
+## 8. Archival Processing and Workbench Tasks
 
 Build the processing workflow around real archival work rather than around a generalized workflow engine.
 
@@ -156,7 +196,7 @@ Do not build a generalized workflow engine merely to support hypothetical future
 
 ---
 
-## 8. Descriptive and Administrative Metadata
+## 9. Descriptive and Administrative Metadata
 
 Add the metadata actually required by the archival workflow.
 
@@ -176,7 +216,7 @@ The goal is not to create a comprehensive metadata-management system in advance.
 
 ---
 
-## 9. Derivatives and Processing Outputs
+## 10. Derivatives and Processing Outputs
 
 Distinguish original digital representations from working and publication derivatives.
 
@@ -191,7 +231,7 @@ AW should track and support these relationships, but it is not intended to becom
 
 ---
 
-## 10. Review and Quality Control
+## 11. Review and Quality Control
 
 Provide a way to surface material problems requiring attention.
 
@@ -207,7 +247,7 @@ The workbench should make problems visible and support human review. It should n
 
 ---
 
-## 11. Search, Retrieval, and Navigation
+## 12. Search, Retrieval, and Navigation
 
 Once enough archival data exists to make retrieval useful, support efficient navigation across it.
 
@@ -224,7 +264,7 @@ Search should be driven by the information archivists actually need to retrieve,
 
 ---
 
-## 12. Omeka S Preparation and Export
+## 13. Omeka S Preparation and Export
 
 Prepare archival information and files for publication through Omeka S.
 
@@ -242,7 +282,7 @@ AW should not become a replacement for Omeka S.
 
 ---
 
-## 13. Persistence
+## 14. Persistence
 
 Introduce durable persistence only after the domain and workflow have earned stable requirements.
 
@@ -260,7 +300,7 @@ The persistence model should preserve the architectural boundary between distinc
 
 ---
 
-## 14. Operationalization and Real Archive Use
+## 15. Operationalization and Real Archive Use
 
 Exercise AW against real archival material and real working conditions.
 
