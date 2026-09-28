@@ -43,7 +43,7 @@
     },
     "openrouter": {
       "options": {
-        "apiKey": "env:OPENROUTER_API_KEY"
+        "apiKey": "{env:OPENROUTER_API_KEY}"
       },
       "models": {
         "deepseek/deepseek-v4.1-flash": {},
@@ -63,7 +63,8 @@
         "bash": "allow",
         "task": {
           "*": "deny",
-          "implementer": "allow"
+          "implementer": "allow",
+          "reviewer": "allow"
         }
       },
       "options": {
@@ -86,6 +87,22 @@
         "temperature": 1.0
       }
     },
+    "reviewer": {
+      "description": "Independent read-only code reviewer. Examines the implemented changes against repository requirements and identifies correctness, architecture, testing, or scope problems.",
+      "mode": "subagent",
+      "model": "ollama/qwen3.6:latest",
+      "prompt": "{file:prompts/reviewer.md}",
+      "permission": {
+        "edit": "deny",
+        "bash": "allow",
+        "task": {
+          "*": "deny"
+        }
+      },
+      "options": {
+        "temperature": 1.0
+      }
+    },
     "cloud-architect": {
       "description": "Cloud primary lead agent. Investigates the repository, plans minimal changes, delegates code execution to the Cloud Implementer, and verifies results.",
       "mode": "primary",
@@ -97,7 +114,7 @@
         "task": {
           "*": "deny",
           "cloud-implementer": "allow",
-          "reviewer": "allow"
+          "cloud-reviewer": "allow"
         }
       },
       "options": {
