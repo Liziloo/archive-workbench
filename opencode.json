@@ -17,6 +17,10 @@
   "model": "ollama/qwen3.6:latest",
   "default_agent": "architect",
   "subagent_depth": 1,
+  "compaction": {
+    "auto": true,
+    "prune": true
+  },
   "provider": {
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",
@@ -159,7 +163,6 @@
   },
   "username": "liz",
   "instructions": [
-    "AGENTS.md",
     "docs/PROJECT.md",
     "docs/DECISIONS.md",
     "docs/ROADMAP.md"
