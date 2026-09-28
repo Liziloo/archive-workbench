@@ -19,7 +19,8 @@
   "subagent_depth": 1,
   "compaction": {
     "auto": true,
-    "prune": true
+    "prune": true,
+    "reserved": 24000
   },
   "provider": {
     "ollama": {
