@@ -40,3 +40,6 @@ node_modules/
 
 # Repomix
 repomix-output.xml
+
+opencode.json.tui-migration.bak
+

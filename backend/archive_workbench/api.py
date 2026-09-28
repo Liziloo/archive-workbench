@@ -1,9 +1,9 @@
-from fastapi import Body, FastAPI, UploadFile, File
+from fastapi import Body, FastAPI, UploadFile, File, Response
 from pathlib import Path
+import json
 from fastapi.middleware.cors import CORSMiddleware
 from archive_workbench.archival_object import ArchivalObject
 import tempfile
-import shutil
 
 app = FastAPI(title="Archive Workbench API")
 
@@ -61,18 +61,28 @@ async def add_representation(object_id: str, path: str = Body(embed=True)):
     # Add the new representation using proper domain logic
     file_path = Path(path)
     representation_obj = archival_object.add_representation(file_path)
-    
-    # Build response with all current representations including the newly added one 
+
+    # Build response with all current representations regardless of duplicate status
     final_representations = []
     for rep in archival_object.representations:
         final_representations.append({
             "path": str(rep.path),
-            "integrity_status": rep.integrity_status,
+            "identity": rep.identity,
+            "duplicate": rep.duplicate,
+            "added": rep.added,
         })
-    
-    # Update the in-memory store
+
+    # If the duplicate was detected without confirmation, return 409 Conflict with current representations
+    if not representation_obj.added:
+        return Response(
+            status_code=409,
+            content=json.dumps({"detail": "Duplicate", "representations": final_representations}),
+            media_type="application/json",
+        )
+
+    # Update the in-memory store (only on success — duplicate was never added to archival_object)
     _archival_objects[object_id]["representations"] = final_representations
-    
+
     return _archival_objects[object_id]
 
 
@@ -107,18 +117,28 @@ async def add_representation_from_upload(object_id: str, file: UploadFile = File
         
         # Add the new representation using proper domain logic with temporary file path
         representation_obj = archival_object.add_representation(tmp_path)
-        
-        # Build response with all current representations including the newly added one 
+
+        # Build response with all current representations regardless of duplicate status
         final_representations = []
         for rep in archival_object.representations:
             final_representations.append({
                 "path": str(rep.path),
-                "integrity_status": rep.integrity_status,
+                "identity": rep.identity,
+                "duplicate": rep.duplicate,
+                "added": rep.added,
             })
-        
-        # Update the in-memory store
+
+        # If the duplicate was detected without confirmation, return 409 Conflict with current representations
+        if not representation_obj.added:
+            return Response(
+                status_code=409,
+                content=json.dumps({"detail": "Duplicate", "representations": final_representations}),
+                media_type="application/json",
+            )
+
+        # Update the in-memory store (only on success — duplicate was never added to archival_object)
         _archival_objects[object_id]["representations"] = final_representations
-        
+
         return _archival_objects[object_id]
     
     finally:
