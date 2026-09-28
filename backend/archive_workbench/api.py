@@ -28,6 +28,34 @@ _archival_objects = {
 }
 
 
+@app.get("/api/archival-objects")
+async def list_archival_objects() -> list[dict]:
+    """Return a list of all archival objects with summary info."""
+    return [
+        {
+            "id": ao["id"],
+            "representation_count": len(ao["representations"]),
+        }
+        for ao in _archival_objects.values()
+    ]
+
+
+@app.post("/api/archival-objects", status_code=201)
+async def create_archival_object() -> dict:
+    """Create a new archival object and return it."""
+    import uuid
+
+    object_id = str(uuid.uuid4())
+    _archival_objects[object_id] = {
+        "id": object_id,
+        "representations": [],
+    }
+    return {
+        "id": object_id,
+        "representation_count": 0,
+    }
+
+
 @app.get("/api/archival-objects/{object_id}")
 async def get_archival_object(object_id: str):
     if object_id not in _archival_objects:
