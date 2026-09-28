@@ -40,6 +40,16 @@
           }
         }
       }
+    },
+    "openrouter": {
+      "options": {
+        "apiKey": "env:OPENROUTER_API_KEY"
+      },
+      "models": {
+        "deepseek/deepseek-v4.1-flash": {},
+        "deepseek/deepseek-v4-flash-0731": {},
+        "z-ai/glm-5.3-flash": {}
+      }
     }
   },
   "agent": {
@@ -67,6 +77,56 @@
       "prompt": "{file:prompts/implementer.md}",
       "permission": {
         "edit": "allow",
+        "bash": "allow",
+        "task": {
+          "*": "deny"
+        }
+      },
+      "options": {
+        "temperature": 1.0
+      }
+    },
+    "cloud-architect": {
+      "description": "Cloud primary lead agent. Investigates the repository, plans minimal changes, delegates code execution to the Cloud Implementer, and verifies results.",
+      "mode": "primary",
+      "model": "openrouter/deepseek/deepseek-v4.1-flash",
+      "prompt": "{file:prompts/architect.md}",
+      "permission": {
+        "edit": "deny",
+        "bash": "allow",
+        "task": {
+          "*": "deny",
+          "cloud-implementer": "allow",
+          "reviewer": "allow"
+        }
+      },
+      "options": {
+        "temperature": 1.0
+      }
+    },
+    "cloud-implementer": {
+      "description": "Cloud worker subagent. Writes tests, implements targeted code changes, and runs project tests to verify execution.",
+      "mode": "subagent",
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+      "prompt": "{file:prompts/implementer.md}",
+      "permission": {
+        "edit": "allow",
+        "bash": "allow",
+        "task": {
+          "*": "deny"
+        }
+      },
+      "options": {
+        "temperature": 1.0
+      }
+    },
+    "cloud-reviewer": {
+      "description": "Independent read-only code reviewer. Examines the implemented changes against repository requirements and identifies correctness, architecture, testing, or scope problems.",
+      "mode": "subagent",
+      "model": "openrouter/z-ai/glm-5.3-flash",
+      "prompt": "{file:prompts/reviewer.md}",
+      "permission": {
+        "edit": "deny",
         "bash": "allow",
         "task": {
           "*": "deny"
